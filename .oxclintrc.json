@@ -1,0 +1,87 @@
+{
+  "extensions": [".js", ".jsx", ".ts", ".tsx"],
+  "excludedFiles": ["node_modules/**", "dist/**", "build/**", "coverage/**"],
+  "plugins": ["typescript", "eslint"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "style": "warn",
+    "pedantic": "warn"
+  },
+  "env": {
+    "browser": false,
+    "es2020": true,
+    "node": true,
+    "jest": true
+  },
+  "globals": {
+    "__dirname": "readonly",
+    "process": "readonly"
+  },
+  "rules": {
+    "no-debugger": "error",
+    "no-duplicate-case": "error",
+    "no-empty": "warn",
+    "no-extra-boolean-cast": "warn",
+    "no-fallthrough": "error",
+    "no-sparse-arrays": "error",
+    "no-unreachable": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_", "varsIgnorePattern": "^_" }],
+    "no-undef": "error",
+    "typescript/no-unnecessary-type-assertion": "warn",
+    "typescript/no-non-null-assertion": "warn",
+    "typescript/no-explicit-any": "warn",
+    "typescript/no-unnecessary-type-constraint": "warn",
+    "typescript/consistent-indexed-object-style": "warn",
+    "typescript/array-type": ["warn", { "default": "generic" }],
+    "typescript/no-extraneous-class": ["warn", { "allowWithDecorator": true }],
+    "typescript/no-inferrable-types": "warn",
+    "eslint/require-await": "warn",
+    "prefer-const": "warn",
+    "no-var": "error",
+    "no-with": "error",
+    "yoda": "warn",
+    "eslint/max-params": ["warn", { "max": 6 }],
+    "eslint/max-lines": ["warn", { "max": 600 }],
+    "eslint/no-negated-condition": "warn",
+    "eslint/no-case-declarations": "warn",
+    "eslint/no-continue": "warn",
+
+    "eslint/init-declarations": "off",
+    "eslint/func-style": "off",
+    "eslint/id-length": "off",
+    "typescript/consistent-type-imports": "off",
+    "max-lines-per-function": "off",
+    "max-depth": "off",
+    "max-classes-per-file": "off",
+    "max-nested-callbacks": "off",
+    "no-ternary": "off",
+    "sort-imports": "off",
+    "sort-keys": "off",
+    "no-magic-numbers": "off",
+    "no-duplicate-imports": "off"
+  },
+  "overrides": [
+    {
+      "files": ["**/*.spec.ts", "**/*.e2e-spec.ts", "**/__tests__/**"],
+      "rules": {
+        "typescript/no-explicit-any": "off",
+        "no-unused-vars": "warn",
+        "eslint/require-await": "off"
+      }
+    },
+    {
+      "files": ["**/*.module.ts"],
+      "rules": {
+        "typescript/no-extraneous-class": "off"
+      }
+    },
+    {
+      "files": ["**/*.dto.ts", "**/*.entity.ts"],
+      "rules": {
+        "eslint/require-await": "off",
+        "typescript/consistent-type-imports": "off"
+      }
+    }
+  ]
+}
