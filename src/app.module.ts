@@ -5,6 +5,7 @@ import { QueueModule } from './infrastructure/queue/queue.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { AnalyticsController } from './analytics/analytics.controller';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ClerkWebhooksModule } from './webhooks/clerk-webhooks.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     QueueModule,
     AnalyticsModule,
     NotificationsModule,
+    ClerkWebhooksModule,
   ],
   controllers: [ AnalyticsController],
 })
