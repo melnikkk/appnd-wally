@@ -1,40 +1,57 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
   previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
-  extensions = [pgvector(version: "0.5.0")]
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector(version: "0.8.0")]
 }
 
-
+model Organization {
+  id                  String   @id @default(uuid())
+  name                String
+  clerkOrganizationId String   @unique
+  users               User[]
+  policies            Policy[]
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+}
 
 model User {
-  id        String    @id
-  email     String    @unique
-  firstName String?
-  lastName  String?
-  policies  Policy[]
-  logs      RequestLog[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id             String        @id @default(uuid())
+  clerkUserId    String        @unique
+  email          String        @unique
+  firstName      String?
+  lastName       String?
+  role           UserRole      @default(USER)
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  policies       Policy[]
+  logs           RequestLog[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([organizationId])
 }
 
 model Policy {
-  id          String      @id @default(uuid())
-  name        String
-  description String?
-  userId      String
-  user        User        @relation(fields: [userId], references: [id])
-  isActive    Boolean     @default(true)
-  rules       Rule[]
-  logs        RequestLog[]
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  userId         String
+  user           User          @relation(fields: [userId], references: [id])
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id])
+  isActive       Boolean       @default(true)
+  rules          Rule[]
+  logs           RequestLog[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
   @@index([userId])
+  @@index([organizationId])
 }
 
 model Rule {
@@ -52,17 +69,17 @@ model Rule {
 }
 
 model RequestLog {
-  id         String    @id @default(uuid())
-  userId     String
-  user       User      @relation(fields: [userId], references: [id])
-  policyId   String?
-  policy     Policy?   @relation(fields: [policyId], references: [id])
-  request    Json
-  response   Json?
-  blocked    Boolean   @default(false)
+  id          String                 @id @default(uuid())
+  userId      String
+  user        User                   @relation(fields: [userId], references: [id])
+  policyId    String?
+  policy      Policy?                @relation(fields: [policyId], references: [id])
+  request     Json
+  response    Json?
+  blocked     Boolean                @default(false)
   blockReason String?
-  embedding  Unsupported("vector")?
-  createdAt  DateTime  @default(now())
+  embedding   Unsupported("vector")?
+  createdAt   DateTime               @default(now())
 
   @@index([userId])
   @@index([policyId])
@@ -74,4 +91,10 @@ enum RuleType {
   TOXIC_LANGUAGE
   PII_DETECTION
   CUSTOM
+}
+
+enum UserRole {
+  USER
+  ADMIN
+  OWNER
 }
