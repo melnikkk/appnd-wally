@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../infrastructure/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
 
 @Injectable()
@@ -10,7 +10,9 @@ export class ClerkWebhooksService {
 
   async handleUserCreated(data: any): Promise<void> {
     try {
-      this.logger.log(`Processing user.created event for ${data.email_addresses?.[0]?.email_address}`);
+      this.logger.log(
+        `Processing user.created event for ${data.email_addresses?.[0]?.email_address}`,
+      );
 
       const email = data.email_addresses?.[0]?.email_address;
 
@@ -32,7 +34,10 @@ export class ClerkWebhooksService {
 
       this.logger.log(`User ${email} created successfully`);
     } catch (error) {
-      this.logger.error(`Error handling user.created event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling user.created event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -66,17 +71,19 @@ export class ClerkWebhooksService {
 
       this.logger.log(`Organization ${data.name} created successfully`);
     } catch (error) {
-      this.logger.error(`Error handling organization.created event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling organization.created event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
-  /**
-   * Handle user update events from Clerk
-   */
   async handleUserUpdated(data: any): Promise<void> {
     try {
-      this.logger.log(`Processing user.updated event for ${data.email_addresses?.[0]?.email_address}`);
+      this.logger.log(
+        `Processing user.updated event for ${data.email_addresses?.[0]?.email_address}`,
+      );
 
       const email = data.email_addresses?.[0]?.email_address;
       if (!email) {
@@ -84,7 +91,6 @@ export class ClerkWebhooksService {
         return;
       }
 
-      // Find the user and update details
       const existingUser = await this.prisma.user.findUnique({
         where: { clerkUserId: data.id },
       });
@@ -105,14 +111,14 @@ export class ClerkWebhooksService {
 
       this.logger.log(`User ${email} updated successfully`);
     } catch (error) {
-      this.logger.error(`Error handling user.updated event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling user.updated event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
-  /**
-   * Handle organization update events from Clerk
-   */
   async handleOrganizationUpdated(data: any): Promise<void> {
     try {
       this.logger.log(`Processing organization.updated event for ${data.name}`);
@@ -135,7 +141,10 @@ export class ClerkWebhooksService {
 
       this.logger.log(`Organization ${data.name} updated successfully`);
     } catch (error) {
-      this.logger.error(`Error handling organization.updated event: ${error.message}`, error.stack);
+      this.logger.error(
+        `Error handling organization.updated event: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
