@@ -10,8 +10,10 @@ import {
 import { Webhook } from 'svix';
 import { ClerkWebhooksService } from './clerk-webhooks.service';
 import { ConfigService } from '@nestjs/config';
+import { Public } from '../../auth/decorators/public.decorator';
 
 @Controller('webhooks/clerk')
+@Public()
 export class ClerkWebhooksController {
   private readonly logger = new Logger(ClerkWebhooksController.name);
 
