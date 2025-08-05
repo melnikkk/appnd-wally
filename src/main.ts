@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
 import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
+import { clerkPlugin } from '@clerk/fastify';
 
 async function bootstrap() {
   process.env.CLERK_API_KEY = process.env.CLERK_SECRET_KEY;
@@ -10,6 +11,8 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter()
   );
+
+  await app.register(clerkPlugin);
   
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

@@ -1,52 +1,20 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
+import type { TextEmbeddingProvider } from './interfaces/text-embeding-provider.interface';
 
 @Injectable()
 export class AnalysisService {
-  async generateEmbedding(_text: string): Promise<number[]> {
-    return Array.from({ length: 1536 }, () => Math.random());
-  }
+  constructor(
+    @Inject('TextEmbeddingProvider')
+    private readonly embeddingProvider: TextEmbeddingProvider,
+  ) {}
 
-  calculateSimilarity(embedding1: number[], embedding2: number[]): number {
-    if (embedding1.length !== embedding2.length) {
-      throw new Error('Embeddings must have the same dimensions');
+  async generateEmbedding(text: string): Promise<Array<number>> {
+    console.log('Generating embedding for text:', text);
+    
+    if (!text || text.trim().length === 0) {
+      return [];
     }
 
-    const dotProduct = embedding1.reduce(
-      (sum, value, i) => sum + value * embedding2[i],
-      0,
-    );
-
-    const magnitude1 = Math.sqrt(
-      embedding1.reduce((sum, value) => sum + value * value, 0),
-    );
-    const magnitude2 = Math.sqrt(
-      embedding2.reduce((sum, value) => sum + value * value, 0),
-    );
-
-    return dotProduct / (magnitude1 * magnitude2);
-  }
-
-  async analyzePrompt(
-    prompt: string,
-    ruleEmbeddings: { ruleId: string; embedding: number[] }[],
-  ) {
-    let highestSimilarity = 0;
-    let mostSimilarRuleId: string | null = null;
-
-    const promptEmbedding = await this.generateEmbedding(prompt);
-
-    for (const ruleEmb of ruleEmbeddings) {
-      const similarity = this.calculateSimilarity(promptEmbedding, ruleEmb.embedding);
-      
-      if (similarity > highestSimilarity) {
-        highestSimilarity = similarity;
-        mostSimilarRuleId = ruleEmb.ruleId;
-      }
-    }
-
-    return {
-      ruleId: mostSimilarRuleId,
-      similarityScore: highestSimilarity,
-    };
+    return this.embeddingProvider.getEmbeddings(text);
   }
 }

@@ -20,7 +20,9 @@
   },
   "dependencies": {
     "@clerk/clerk-sdk-node": "^4.13.23",
+    "@clerk/fastify": "^2.4.15",
     "@fastify/secure-session": "^8.2.0",
+    "@google/generative-ai": "^0.24.1",
     "@nestjs/bull": "^11.0.3",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",

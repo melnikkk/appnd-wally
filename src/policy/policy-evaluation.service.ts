@@ -6,10 +6,13 @@ import { PolicyService } from './policy.service';
 export class PolicyEvaluationService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly policyService: PolicyService
+    private readonly policyService: PolicyService,
   ) {}
 
-  async evaluatePrompt(organizationId: string, prompt: string): Promise<{
+  async evaluatePrompt(
+    organizationId: string,
+    prompt: string,
+  ): Promise<{
     blocked: boolean;
     blockReason?: string;
     matchedRule?: string;
@@ -28,29 +31,28 @@ export class PolicyEvaluationService {
     }
 
     for (const policy of policies) {
-      const evaluation = await this.policyService.evaluatePromptAgainstPolicy(policy.id, prompt);
-      
+      const evaluation = await this.policyService.evaluatePromptAgainstPolicy(
+        policy.id,
+        organizationId,
+        prompt,
+      );
+
       if (evaluation.matched && evaluation.rule) {
-        // If any policy/rule match is found and blocks the prompt
         return {
           blocked: true,
           blockReason: evaluation.rule.description || evaluation.rule.name,
           matchedRule: evaluation.rule.id,
           matchedPolicy: policy.id,
-          similarityScore: evaluation.similarityScore
+          similarityScore: evaluation.similarityScore,
         };
       }
     }
 
-    // No blocking policies found
     return { blocked: false };
   }
 
-  /**
-   * Log a prompt evaluation result
-   */
   async logEvaluation(
-    organizationId: string, 
+    organizationId: string,
     userId: string,
     prompt: string,
     evaluation: {
@@ -59,29 +61,38 @@ export class PolicyEvaluationService {
       matchedRule?: string;
       matchedPolicy?: string;
       similarityScore?: number;
-    }
+    },
   ) {
-    // Create a request log entry
+    const user = await this.prisma.user.findFirst({
+      where: { id: userId, organizationId },
+    });
+
+    if (!user) {
+      throw new Error('Logging failed: User does not belong to the organization.');
+    }
+
     await this.prisma.requestLog.create({
       data: {
         user: {
-          connect: { id: userId }
+          connect: { id: userId },
         },
-        policy: evaluation.matchedPolicy ? {
-          connect: { id: evaluation.matchedPolicy }
-        } : undefined,
+        policy: evaluation.matchedPolicy
+          ? {
+              connect: { id: evaluation.matchedPolicy },
+            }
+          : undefined,
         request: {
           prompt,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
         },
         response: {
           blocked: evaluation.blocked,
           blockReason: evaluation.blockReason,
-          similarityScore: evaluation.similarityScore
+          similarityScore: evaluation.similarityScore,
         },
         blocked: evaluation.blocked,
-        blockReason: evaluation.blockReason
-      }
+        blockReason: evaluation.blockReason,
+      },
     });
   }
 }

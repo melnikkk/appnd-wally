@@ -33,7 +33,7 @@ export class ClerkGlobalGuard implements CanActivate {
     }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
-
+    
     if (request.auth?.userId) {
       try {
         const user = await this.clerkSessionService.getUserByClerkId(request.auth.userId);
