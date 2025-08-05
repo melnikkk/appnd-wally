@@ -6,6 +6,8 @@ import { UpdatePolicyDto } from './dto/update-policy.dto';
 import { RuleService } from '../rule/rule.service';
 import { AnalysisService } from '../analysis/analysis.service';
 
+const SIMILARITY_THRESHOLD = 0.75;
+
 @Injectable()
 export class PolicyService {
   constructor(
@@ -33,7 +35,7 @@ export class PolicyService {
       });
 
       if (rules.length > 0) {
-        await this.ruleService.createMany(policy.id, rules);
+        await this.ruleService.createMany(policy.id, rules, prisma);
       }
 
       return policy;
@@ -134,42 +136,31 @@ export class PolicyService {
     });
   }
 
-  async evaluatePromptAgainstPolicy(policyId: string, prompt: string) {
-    const policy = await this.findOne(policyId);
-    
-    if (!policy) {
-      return { matched: false, rule: null, similarityScore: 0 };
-    }
-    
-    const ruleEmbeddings = policy.rules.map(rule => {
-      const parameters = rule.parameters as any;
+  async evaluatePromptAgainstPolicy(
+    policyId: string,
+    organizationId: string,
+    prompt: string,
+  ): Promise<{ matched: boolean; rule?: any; similarityScore?: number }> {
+    const promptEmbedding = await this.analysisService.generateEmbedding(prompt);
 
-      return {
-        ruleId: rule.id,
-        embedding: parameters.embedding || [],
-        rule: rule,
-      };
-    });
-    
-    const validRuleEmbeddings = ruleEmbeddings.filter(re => re.embedding.length > 0);
-    
-    if (validRuleEmbeddings.length === 0) {
-      return { matched: false, rule: null, similarityScore: 0 };
-    }
-
-    const { ruleId, similarityScore } = await this.analysisService.analyzePrompt(
-      prompt,
-      validRuleEmbeddings
+    const similarRule = await this.ruleService.findMostSimilar(
+      promptEmbedding,
+      policyId,
+      organizationId,
     );
 
-    const matchedRuleInfo = ruleId 
-      ? ruleEmbeddings.find(re => re.ruleId === ruleId)
-      : null;
+    if (similarRule) {
+      if (similarRule.similarityScore > SIMILARITY_THRESHOLD) {
+        const ruleDetails = await this.ruleService.findOne(similarRule.ruleId);
+        
+        return {
+          matched: true,
+          rule: ruleDetails,
+          similarityScore: similarRule.similarityScore,
+        };
+      }
+    }
 
-    return {
-      matched: similarityScore > 0.8, // TODO: Threshold should be configurable
-      rule: matchedRuleInfo?.rule || null,
-      similarityScore,
-    };
+    return { matched: false };
   }
 }
