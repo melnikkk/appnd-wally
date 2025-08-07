@@ -1,9 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { PolicyService } from './policy.service';
 
 @Injectable()
 export class PolicyEvaluationService {
+  private readonly logger = new Logger(PolicyEvaluationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly policyService: PolicyService,
@@ -19,33 +21,21 @@ export class PolicyEvaluationService {
     matchedPolicy?: string;
     similarityScore?: number;
   }> {
-    const policies = await this.prisma.policy.findMany({
-      where: {
-        organizationId,
-        isActive: true,
-      },
-    });
+    const evaluation = await this.policyService.findBestMatchAcrossAllPolicies(
+      organizationId,
+      prompt,
+    );
 
-    if (!policies || policies.length === 0) {
-      return { blocked: false };
-    }
-
-    for (const policy of policies) {
-      const evaluation = await this.policyService.evaluatePromptAgainstPolicy(
-        policy.id,
-        organizationId,
-        prompt,
-      );
-
-      if (evaluation.matched && evaluation.rule) {
-        return {
-          blocked: true,
-          blockReason: evaluation.rule.description || evaluation.rule.name,
-          matchedRule: evaluation.rule.id,
-          matchedPolicy: policy.id,
-          similarityScore: evaluation.similarityScore,
-        };
-      }
+    this.logger.debug('Similarity evaluation result:', evaluation);
+    
+    if (evaluation.matched && evaluation.rule) {
+      return {
+        blocked: true,
+        blockReason: evaluation.rule.description || evaluation.rule.name,
+        matchedRule: evaluation.rule.id,
+        matchedPolicy: evaluation.policyId,
+        similarityScore: evaluation.similarityScore,
+      };
     }
 
     return { blocked: false };

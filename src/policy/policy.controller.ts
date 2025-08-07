@@ -1,16 +1,8 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete,
-  Query
-} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
 import { PolicyService } from './policy.service';
 import { CreatePolicyDto } from './dto/create-policy.dto';
 import { UpdatePolicyDto } from './dto/update-policy.dto';
+import { EvaluatePromptDto } from './dto/evaluate-prompt.dto';
 import { PolicyEvaluationService } from './policy-evaluation.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
@@ -18,37 +10,40 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class PolicyController {
   constructor(
     private readonly policyService: PolicyService,
-    private readonly policyEvaluationService: PolicyEvaluationService
+    private readonly policyEvaluationService: PolicyEvaluationService,
   ) {}
 
   @Post()
   async create(@CurrentUser() user, @Body() createPolicyDto: CreatePolicyDto) {
     return this.policyService.create(user.id, createPolicyDto);
   }
-  
+
   @Post('evaluate')
   async evaluatePrompt(
     @CurrentUser() user,
-    @Body() evaluatePromptDto: { prompt: string; organizationId?: string }
+    @Body() evaluatePromptDto: EvaluatePromptDto,
   ) {
-    const { prompt, organizationId = user.organizationId } = evaluatePromptDto;
-    
+    const { prompt } = evaluatePromptDto;
+    const organizationId = user.organizationId;
+
     if (!organizationId) {
       throw new Error('Organization ID is required');
     }
-    
+
     const evaluation = await this.policyEvaluationService.evaluatePrompt(
       organizationId,
-      prompt
+      prompt,
     );
-    
+
+    console.log(`Evaluation result: ${JSON.stringify(evaluation)}`);
+
     await this.policyEvaluationService.logEvaluation(
       organizationId,
       user.id,
       prompt,
-      evaluation
+      evaluation,
     );
-    
+
     return evaluation;
   }
 

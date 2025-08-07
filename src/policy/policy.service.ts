@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Policy, Prisma } from '@prisma/client';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { CreatePolicyDto } from './dto/create-policy.dto';
@@ -6,10 +6,12 @@ import { UpdatePolicyDto } from './dto/update-policy.dto';
 import { RuleService } from '../rule/rule.service';
 import { AnalysisService } from '../analysis/analysis.service';
 
-const SIMILARITY_THRESHOLD = 0.75;
+const SIMILARITY_THRESHOLD = 0.55;
 
 @Injectable()
 export class PolicyService {
+  private readonly logger = new Logger(PolicyService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly ruleService: RuleService,
@@ -136,31 +138,49 @@ export class PolicyService {
     });
   }
 
-  async evaluatePromptAgainstPolicy(
-    policyId: string,
+  async findBestMatchAcrossAllPolicies(
     organizationId: string,
     prompt: string,
-  ): Promise<{ matched: boolean; rule?: any; similarityScore?: number }> {
+  ): Promise<{ matched: boolean; rule?: any; policyId?: string; similarityScore?: number }> {
     const promptEmbedding = await this.analysisService.generateEmbedding(prompt);
+    
+    const vector = `[${promptEmbedding.join(',')}]`;
 
-    const similarRule = await this.ruleService.findMostSimilar(
-      promptEmbedding,
-      policyId,
-      organizationId,
+    const result = await this.prisma.$queryRaw<Array<{ ruleId: string; description: string; name: string; policyId: string; similarityScore: number }>>(
+      Prisma.sql`
+        SELECT
+          "Rule".id as "ruleId",
+          "Rule".name,
+          "Rule".description,
+          "Policy".id as "policyId",
+          1 - ("Rule".embedding <=> ${vector}::vector) as "similarityScore"
+        FROM "Rule"
+        INNER JOIN "Policy" ON "Rule"."policyId" = "Policy".id
+        WHERE "Policy"."organizationId" = ${organizationId}
+          AND "Policy"."isActive" = TRUE
+          AND 1 - ("Rule".embedding <=> ${vector}::vector) > ${SIMILARITY_THRESHOLD}
+        ORDER BY "similarityScore" DESC
+        LIMIT 1;
+      `,
     );
 
-    if (similarRule) {
-      if (similarRule.similarityScore > SIMILARITY_THRESHOLD) {
-        const ruleDetails = await this.ruleService.findOne(similarRule.ruleId);
-        
-        return {
-          matched: true,
-          rule: ruleDetails,
-          similarityScore: similarRule.similarityScore,
-        };
-      }
+    this.logger.debug(`Best match across all policies: ${JSON.stringify(result)}`);
+
+    if (!result || result.length === 0) {
+      return { matched: false };
     }
 
-    return { matched: false };
+    const bestMatch = result[0];
+    
+    return {
+      matched: true,
+      rule: {
+        id: bestMatch.ruleId,
+        name: bestMatch.name,
+        description: bestMatch.description
+      },
+      policyId: bestMatch.policyId,
+      similarityScore: bestMatch.similarityScore,
+    };
   }
 }

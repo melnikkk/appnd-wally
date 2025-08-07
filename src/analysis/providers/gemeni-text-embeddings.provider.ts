@@ -27,8 +27,6 @@ export class GeminiTextEmbeddingProvider implements TextEmbeddingProvider {
         embedding: { values },
       } = await this.model.embedContent(prompt);
       
-      this.logger.log('Gemini Text Embedding Values', values);
-      
       return values;
     } catch (error) {
       this.logger.error('Failed to get embeddings from Gemini', error);

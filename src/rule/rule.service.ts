@@ -139,6 +139,8 @@ export class RuleService {
       `,
     );
 
+    this.logger.log(`Most similar rule found: ${JSON.stringify(result)}`);
+
     if (!result || result.length === 0) {
       return null;
     }
@@ -151,6 +153,4 @@ export class RuleService {
       similarityScore: 1 - mostSimilarRule.distance,
     };
   }
-
-
 }
