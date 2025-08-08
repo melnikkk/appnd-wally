@@ -56,8 +56,10 @@ model Policy {
 
 model Rule {
   id          String   @id @default(uuid())
+  type        RuleType @default(SEMANTIC_BLOCK)
   name        String
   description String?
+  pattern     String?  // For KEYWORD_BLOCK, stores keywords or regex patterns
   policyId    String
   policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
   embedding   Unsupported("vector(3072)")?
@@ -88,4 +90,9 @@ enum UserRole {
   USER
   ADMIN
   OWNER
+}
+
+enum RuleType {
+  SEMANTIC_BLOCK
+  KEYWORD_BLOCK
 }

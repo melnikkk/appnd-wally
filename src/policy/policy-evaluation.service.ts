@@ -16,6 +16,7 @@ export class PolicyEvaluationService {
     prompt: string,
   ): Promise<{
     blocked: boolean;
+    ruleType: string;
     blockReason?: string;
     matchedRule?: string;
     matchedPolicy?: string;
@@ -26,7 +27,7 @@ export class PolicyEvaluationService {
       prompt,
     );
 
-    this.logger.debug('Similarity evaluation result:', evaluation);
+    this.logger.debug('Evaluation result:', evaluation);
     
     if (evaluation.matched && evaluation.rule) {
       return {
@@ -35,6 +36,7 @@ export class PolicyEvaluationService {
         matchedRule: evaluation.rule.id,
         matchedPolicy: evaluation.policyId,
         similarityScore: evaluation.similarityScore,
+        ruleType: evaluation.ruleType,
       };
     }
 
@@ -47,6 +49,7 @@ export class PolicyEvaluationService {
     prompt: string,
     evaluation: {
       blocked: boolean;
+      ruleType: string;
       blockReason?: string;
       matchedRule?: string;
       matchedPolicy?: string;
@@ -79,6 +82,7 @@ export class PolicyEvaluationService {
           blocked: evaluation.blocked,
           blockReason: evaluation.blockReason,
           similarityScore: evaluation.similarityScore,
+          ruleType: evaluation.ruleType,
         },
         blocked: evaluation.blocked,
         blockReason: evaluation.blockReason,

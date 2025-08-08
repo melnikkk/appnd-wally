@@ -1,9 +1,18 @@
-import { IsString } from 'class-validator';
+import { IsString, IsOptional, IsEnum } from 'class-validator';
+import { RuleType } from '../rule.types';
 
 export class CreateRuleDto {
   @IsString()
   name: string;
 
+  @IsEnum(RuleType)
+  type: RuleType;
+
   @IsString()
-  description: string;
+  @IsOptional()
+  description?: string;
+
+  @IsString()
+  @IsOptional()
+  pattern?: string; // KEYWORD_BLOCK type
 }
