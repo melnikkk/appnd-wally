@@ -1,0 +1,4 @@
+export enum RuleType {
+  SEMANTIC_BLOCK = 'SEMANTIC_BLOCK',
+  KEYWORD_BLOCK = 'KEYWORD_BLOCK',
+}

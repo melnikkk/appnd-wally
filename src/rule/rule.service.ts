@@ -4,6 +4,7 @@ import { AnalysisService } from '../analysis/analysis.service';
 import { Rule, Prisma } from '@prisma/client';
 import { CreateRuleDto } from './dto/create-rule.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
+import { RuleType } from './rule.types';
 
 @Injectable()
 export class RuleService {
@@ -19,10 +20,9 @@ export class RuleService {
     createRuleDto: CreateRuleDto, 
     prismaClient?: any
   ): Promise<Rule> {
-    const { name, description } = createRuleDto;
+    const { name, description, type, pattern } = createRuleDto;
     const client = prismaClient || this.prisma;
 
-    // First create the rule without the embedding
     const rule = await client.rule.create({
       data: {
         name,
@@ -33,16 +33,29 @@ export class RuleService {
       }
     });
     
-    // Then generate and update the embedding separately
-    const embeddingArray = await this.analysisService.generateEmbedding(description || name);
-    this.logger.debug(`Generated embedding for rule with dimensions: ${embeddingArray.length}`);
+    const updateData: any = {
+      type,
+    };
     
-    if (embeddingArray && embeddingArray.length > 0) {
-      await client.$executeRaw`
-        UPDATE "Rule" 
-        SET "embedding" = ${embeddingArray}
-        WHERE "id" = ${rule.id};
-      `;
+    if (type === RuleType.KEYWORD_BLOCK && pattern) {
+      updateData.pattern = pattern;
+    }
+    
+    await client.rule.update({
+      where: { id: rule.id },
+      data: updateData as any
+    });
+    
+    if (type === RuleType.SEMANTIC_BLOCK) {
+      const embeddingArray = await this.analysisService.generateEmbedding(description);
+      
+      if (embeddingArray && embeddingArray.length > 0) {
+        await client.$executeRaw`
+          UPDATE "Rule" 
+          SET "embedding" = ${embeddingArray}
+          WHERE "id" = ${rule.id};
+        `;
+      }
     }
     
     return rule;
@@ -78,7 +91,7 @@ export class RuleService {
   }
 
   async update(id: string, updateRuleDto: UpdateRuleDto): Promise<Rule> {
-    const { name, description } = updateRuleDto;
+    const { name, description, type, pattern } = updateRuleDto;
 
     const existingRule = await this.findOne(id);
 
@@ -86,7 +99,11 @@ export class RuleService {
       throw new Error(`Rule with ID ${id} not found`);
     }
 
-    // First update the basic properties
+    const fullRule = await this.prisma.rule.findUnique({
+      where: { id }
+    });
+    const existingType = (fullRule as any)?.type;
+
     const updatedRule = await this.prisma.rule.update({
       where: { id },
       data: {
@@ -95,10 +112,35 @@ export class RuleService {
       }
     });
     
-    // Then update the embedding if we have a new description
-    if (description) {
+    const updateData: any = {};
+    
+    if (type) {
+      updateData.type = type;
+    }
+    
+    if (type === RuleType.KEYWORD_BLOCK) {
+      let currentPattern = pattern;
+
+      if (!currentPattern) {
+        const ruleWithPattern = await this.prisma.rule.findUnique({
+          where: { id }
+        });
+
+        currentPattern = (ruleWithPattern as any)?.pattern;
+      }
+      
+      updateData.pattern = currentPattern || '';
+    }
+    
+    if (Object.keys(updateData).length > 0) {
+      await this.prisma.rule.update({
+        where: { id },
+        data: updateData
+      });
+    }
+
+    if (type === RuleType.SEMANTIC_BLOCK && description) {
       const embeddingArray = await this.analysisService.generateEmbedding(description);
-      this.logger.debug(`Generated embedding for rule update with dimensions: ${embeddingArray?.length || 0}`);
       
       if (embeddingArray && embeddingArray.length > 0) {
         await this.prisma.$executeRaw`
@@ -107,6 +149,14 @@ export class RuleService {
           WHERE "id" = ${id};
         `;
       }
+    }
+
+    if (type === RuleType.KEYWORD_BLOCK && existingType === RuleType.SEMANTIC_BLOCK) {
+      await this.prisma.$executeRaw`
+        UPDATE "Rule" 
+        SET "embedding" = NULL
+        WHERE "id" = ${id};
+      `;
     }
     
     return updatedRule;
@@ -138,8 +188,6 @@ export class RuleService {
         LIMIT 1;
       `,
     );
-
-    this.logger.log(`Most similar rule found: ${JSON.stringify(result)}`);
 
     if (!result || result.length === 0) {
       return null;

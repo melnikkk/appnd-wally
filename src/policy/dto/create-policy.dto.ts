@@ -19,6 +19,5 @@ export class CreatePolicyDto {
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateRuleDto)
-  @IsOptional()
-  rules?: CreateRuleDto[];
+  rules: Array<CreateRuleDto>;
 }
