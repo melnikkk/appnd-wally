@@ -20,13 +20,14 @@ export class PolicyEvaluationService {
     matchedRule?: string;
     matchedPolicy?: string;
     similarityScore?: number;
+    ruleType?: string;
   }> {
     const evaluation = await this.policyService.findBestMatchAcrossAllPolicies(
       organizationId,
       prompt,
     );
 
-    this.logger.debug('Similarity evaluation result:', evaluation);
+
     
     if (evaluation.matched && evaluation.rule) {
       return {
@@ -35,6 +36,7 @@ export class PolicyEvaluationService {
         matchedRule: evaluation.rule.id,
         matchedPolicy: evaluation.policyId,
         similarityScore: evaluation.similarityScore,
+        ruleType: evaluation.ruleType,
       };
     }
 
@@ -51,6 +53,7 @@ export class PolicyEvaluationService {
       matchedRule?: string;
       matchedPolicy?: string;
       similarityScore?: number;
+      ruleType?: string;
     },
   ) {
     const user = await this.prisma.user.findFirst({
@@ -79,6 +82,7 @@ export class PolicyEvaluationService {
           blocked: evaluation.blocked,
           blockReason: evaluation.blockReason,
           similarityScore: evaluation.similarityScore,
+          ruleType: evaluation.ruleType,
         },
         blocked: evaluation.blocked,
         blockReason: evaluation.blockReason,

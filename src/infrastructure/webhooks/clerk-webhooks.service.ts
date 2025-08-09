@@ -148,4 +148,72 @@ export class ClerkWebhooksService {
       throw error;
     }
   }
+
+  async handleUserDeleted(data: any): Promise<void> {
+    try {
+      this.logger.log(
+        `Processing user.deleted event for ${data.email_addresses?.[0]?.email_address}`,
+      );
+
+      const email = data.email_addresses?.[0]?.email_address;
+
+      if (!email) {
+        this.logger.warn('No email address found in user data');
+
+        return;
+      }
+
+      const existingUser = await this.prisma.user.findUnique({
+        where: { clerkUserId: data.id },
+      });
+
+      if (!existingUser) {
+        this.logger.warn(`User with Clerk ID ${data.id} not found`);
+
+        return;
+      }
+
+      await this.prisma.user.delete({
+        where: { id: existingUser.id },
+      });
+
+      this.logger.log(`User ${email} deleted successfully`);
+    } catch (error) {
+      this.logger.error(
+        `Error handling user.deleted event: ${error.message}`,
+        error.stack,
+      );
+      
+      throw error;
+    }
+  }
+
+  async handleOrganizationDeleted(data: any): Promise<void> {
+    try {
+      this.logger.log(`Processing organization.deleted event for ${data.name}`);
+
+      const existingOrg = await this.prisma.organization.findUnique({
+        where: { clerkOrganizationId: data.id },
+      });
+
+      if (!existingOrg) {
+        this.logger.warn(`Organization with Clerk ID ${data.id} not found`);
+
+        return;
+      }
+
+      await this.prisma.organization.delete({
+        where: { id: existingOrg.id },
+      });
+
+      this.logger.log(`Organization ${data.name} deleted successfully`);
+    } catch (error) {
+      this.logger.error(
+        `Error handling organization.deleted event: ${error.message}`,
+        error.stack,
+      );
+
+      throw error;
+    }
+  }
 }

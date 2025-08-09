@@ -54,6 +54,12 @@ export class ClerkWebhooksController {
       case 'organization.updated':
         return this.clerkWebhooksService.handleOrganizationUpdated(data);
 
+      case 'user.deleted':
+        return this.clerkWebhooksService.handleUserDeleted(data);
+
+      case 'organization.deleted':
+        return this.clerkWebhooksService.handleOrganizationDeleted(data);
+
       default:
         return { message: `Webhook event ${type} received but no handler implemented` };
     }
@@ -72,10 +78,10 @@ export class ClerkWebhooksController {
         this.logger.error('Clerk webhook secret is not set');
 
         return false;
-      } 
+      }
 
       const webhook = new Webhook(secret);
-      
+
       webhook.verify(JSON.stringify(payload), {
         'svix-id': svixId,
         'svix-timestamp': svixTimestamp,

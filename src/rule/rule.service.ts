@@ -4,6 +4,7 @@ import { AnalysisService } from '../analysis/analysis.service';
 import { Rule, Prisma } from '@prisma/client';
 import { CreateRuleDto } from './dto/create-rule.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
+import { RuleType } from './rule.types';
 
 @Injectable()
 export class RuleService {
@@ -15,43 +16,43 @@ export class RuleService {
   ) {}
 
   async create(
-    policyId: string, 
-    createRuleDto: CreateRuleDto, 
-    prismaClient?: any
+    policyId: string,
+    createRuleDto: CreateRuleDto,
+    prismaClient?: any,
   ): Promise<Rule> {
-    const { name, description } = createRuleDto;
+    const { name, description, type } = createRuleDto;
     const client = prismaClient || this.prisma;
 
-    // First create the rule without the embedding
     const rule = await client.rule.create({
       data: {
         name,
         description,
+        type,
         policy: {
-          connect: { id: policyId }
-        }
-      }
+          connect: { id: policyId },
+        },
+      },
     });
-    
-    // Then generate and update the embedding separately
-    const embeddingArray = await this.analysisService.generateEmbedding(description || name);
-    this.logger.debug(`Generated embedding for rule with dimensions: ${embeddingArray.length}`);
-    
-    if (embeddingArray && embeddingArray.length > 0) {
-      await client.$executeRaw`
-        UPDATE "Rule" 
-        SET "embedding" = ${embeddingArray}
-        WHERE "id" = ${rule.id};
-      `;
+
+    if (type === RuleType.SEMANTIC_BLOCK && description) {
+      const embeddingArray = await this.analysisService.generateEmbedding(description);
+
+      if (embeddingArray && embeddingArray.length > 0) {
+        await client.$executeRaw`
+          UPDATE "Rule" 
+          SET "embedding" = ${embeddingArray}
+          WHERE "id" = ${rule.id};
+        `;
+      }
     }
-    
+
     return rule;
   }
 
   async createMany(
-    policyId: string, 
-    createRuleDtos: CreateRuleDto[], 
-    prismaClient?: any
+    policyId: string,
+    createRuleDtos: CreateRuleDto[],
+    prismaClient?: any,
   ): Promise<Rule[]> {
     const createdRules: Rule[] = [];
 
@@ -78,7 +79,7 @@ export class RuleService {
   }
 
   async update(id: string, updateRuleDto: UpdateRuleDto): Promise<Rule> {
-    const { name, description } = updateRuleDto;
+    const { name, description, type } = updateRuleDto;
 
     const existingRule = await this.findOne(id);
 
@@ -86,21 +87,27 @@ export class RuleService {
       throw new Error(`Rule with ID ${id} not found`);
     }
 
-    // First update the basic properties
+    const updateData: any = {
+      type,
+      name: name || existingRule.name,
+      description: description || existingRule.description,
+    };
+
     const updatedRule = await this.prisma.rule.update({
       where: { id },
-      data: {
-        name: name || existingRule.name,
-        description: description || existingRule.description,
-      }
+      data: updateData,
     });
-    
-    // Then update the embedding if we have a new description
-    if (description) {
-      const embeddingArray = await this.analysisService.generateEmbedding(description);
-      this.logger.debug(`Generated embedding for rule update with dimensions: ${embeddingArray?.length || 0}`);
-      
-      if (embeddingArray && embeddingArray.length > 0) {
+
+    const shouldUpdateEmbedding =
+      (type === RuleType.SEMANTIC_BLOCK || (existingRule.type === RuleType.SEMANTIC_BLOCK && !type)) &&
+      description;
+
+    if (shouldUpdateEmbedding) {
+      const embeddingArray = await this.analysisService.generateEmbedding(
+        description,
+      );
+
+      if (embeddingArray.length > 0) {
         await this.prisma.$executeRaw`
           UPDATE "Rule" 
           SET "embedding" = ${embeddingArray}
@@ -108,7 +115,7 @@ export class RuleService {
         `;
       }
     }
-    
+
     return updatedRule;
   }
 

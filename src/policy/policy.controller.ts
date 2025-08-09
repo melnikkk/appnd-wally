@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Logger } from '@nestjs/common';
 import { PolicyService } from './policy.service';
 import { CreatePolicyDto } from './dto/create-policy.dto';
 import { UpdatePolicyDto } from './dto/update-policy.dto';
@@ -8,6 +8,8 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @Controller('policies')
 export class PolicyController {
+  private readonly logger = new Logger(PolicyController.name);
+  
   constructor(
     private readonly policyService: PolicyService,
     private readonly policyEvaluationService: PolicyEvaluationService,
@@ -25,6 +27,8 @@ export class PolicyController {
   ) {
     const { prompt } = evaluatePromptDto;
     const organizationId = user.organizationId;
+
+    this.logger.debug(user)
 
     if (!organizationId) {
       throw new Error('Organization ID is required');
