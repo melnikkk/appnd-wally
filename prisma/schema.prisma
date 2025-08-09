@@ -54,10 +54,16 @@ model Policy {
   @@index([organizationId])
 }
 
+enum RuleType {
+  SEMANTIC_BLOCK
+  KEYWORD_BLOCK
+}
+
 model Rule {
   id          String   @id @default(uuid())
   name        String
   description String?
+  type        RuleType
   policyId    String
   policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
   embedding   Unsupported("vector(3072)")?
