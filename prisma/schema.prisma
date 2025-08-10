@@ -49,6 +49,7 @@ model Policy {
   logs           RequestLog[]
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
+  threshold      Float         @default(0.7)
 
   @@index([userId])
   @@index([organizationId])
@@ -62,11 +63,15 @@ enum RuleType {
 model Rule {
   id          String   @id @default(uuid())
   name        String
-  description String?
-  type        RuleType
+  
   policyId    String
   policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
+  
+  type        RuleType
+  description String?
   embedding   Unsupported("vector(3072)")?
+  threshold   Float?
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 

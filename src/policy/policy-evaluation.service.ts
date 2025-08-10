@@ -26,8 +26,6 @@ export class PolicyEvaluationService {
       organizationId,
       prompt,
     );
-
-
     
     if (evaluation.matched && evaluation.rule) {
       return {

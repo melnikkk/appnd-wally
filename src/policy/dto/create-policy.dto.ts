@@ -1,4 +1,14 @@
-import { IsString, IsOptional, IsBoolean, IsArray, ValidateNested } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsBoolean,
+  IsArray,
+  ValidateNested,
+  IsNumber,
+  IsPositive,
+  Min,
+  Max,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateRuleDto } from '../../rule/dto/create-rule.dto';
 
@@ -15,6 +25,13 @@ export class CreatePolicyDto {
 
   @IsBoolean()
   isActive: boolean;
+
+  @IsNumber()
+  @IsPositive()
+  @IsOptional()
+  @Min(0)
+  @Max(1)
+  threshold?: number;
 
   @IsArray()
   @ValidateNested({ each: true })
