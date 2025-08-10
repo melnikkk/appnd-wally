@@ -1,0 +1,497 @@
+openapi: 3.0.0
+paths:
+  /analytics/process-logs:
+    post:
+      description: Schedules processing of user logs for analytics
+      operationId: AnalyticsController_processLogs
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProcessLogsDto'
+      responses:
+        '200':
+          description: Log processing scheduled
+        '400':
+          description: Bad request
+      security: &ref_0
+        - bearer: []
+      summary: Process user logs
+      tags: &ref_1
+        - analytics
+  /analytics/job/{id}:
+    get:
+      description: Gets the status of a scheduled job
+      operationId: AnalyticsController_getJobStatus
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Job ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job status
+        '404':
+          description: Job not found
+      security: *ref_0
+      summary: Get job status
+      tags: *ref_1
+  /webhooks/clerk:
+    post:
+      description: Processes webhooks from Clerk for user and organization events
+      operationId: ClerkWebhooksController_handleWebhook
+      parameters:
+        - name: svix-signature
+          required: true
+          in: header
+          description: Svix signature for webhook verification
+          schema:
+            type: string
+        - name: svix-id
+          required: true
+          in: header
+          description: Svix ID for webhook verification
+          schema:
+            type: string
+        - name: svix-timestamp
+          required: true
+          in: header
+          description: Svix timestamp for webhook verification
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: Clerk webhook payload
+        content:
+          application/json:
+            schema:
+              type: string
+      responses:
+        '200':
+          description: Webhook processed successfully
+        '400':
+          description: Bad request - missing headers
+        '401':
+          description: Unauthorized - invalid signature
+      summary: Handle Clerk webhook
+      tags:
+        - webhooks
+  /policies:
+    post:
+      description: Creates a new policy with associated rules
+      operationId: PolicyController_create
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePolicyDto'
+      responses:
+        '201':
+          description: Policy successfully created
+        '400':
+          description: Bad request
+      security: &ref_2
+        - bearer: []
+      summary: Create a new policy
+      tags: &ref_3
+        - policies
+    get:
+      description: Returns all policies for the current user or organization
+      operationId: PolicyController_findAll
+      parameters:
+        - name: organizationId
+          required: false
+          in: query
+          description: Filter by organization ID
+          schema:
+            type: string
+        - name: isActive
+          required: false
+          in: query
+          description: Filter by active status
+          schema:
+            type: boolean
+        - name: skip
+          required: false
+          in: query
+          description: Number of records to skip for pagination
+          schema:
+            type: number
+        - name: take
+          required: false
+          in: query
+          description: Number of records to take for pagination
+          schema:
+            type: number
+      responses:
+        '200':
+          description: List of policies
+      security: *ref_2
+      summary: Get all policies
+      tags: *ref_3
+  /policies/evaluate:
+    post:
+      description: Evaluates the given prompt against active policies
+      operationId: PolicyController_evaluatePrompt
+      parameters: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluatePromptDto'
+      responses:
+        '200':
+          description: Prompt successfully evaluated
+        '400':
+          description: Bad request
+      security: *ref_2
+      summary: Evaluate a prompt against policies
+      tags: *ref_3
+  /policies/{id}:
+    get:
+      description: Returns a policy by its ID
+      operationId: PolicyController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Policy ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The policy
+        '404':
+          description: Policy not found
+      security: *ref_2
+      summary: Get a policy by ID
+      tags: *ref_3
+    patch:
+      description: Updates a policy by its ID
+      operationId: PolicyController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Policy ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdatePolicyDto'
+      responses:
+        '200':
+          description: Policy updated successfully
+        '404':
+          description: Policy not found
+      security: *ref_2
+      summary: Update a policy
+      tags: *ref_3
+    delete:
+      description: Deletes a policy by its ID
+      operationId: PolicyController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Policy ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Policy deleted successfully
+        '404':
+          description: Policy not found
+      security: *ref_2
+      summary: Delete a policy
+      tags: *ref_3
+  /policies/{policyId}/rules:
+    post:
+      description: Creates a new rule for a specific policy
+      operationId: RuleController_create
+      parameters:
+        - name: policyId
+          required: true
+          in: path
+          description: Policy ID to create a rule for
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRuleDto'
+      responses:
+        '201':
+          description: Rule successfully created
+        '400':
+          description: Bad request
+        '404':
+          description: Policy not found
+      security: &ref_4
+        - bearer: []
+      summary: Create a new rule
+      tags: &ref_5
+        - rules
+    get:
+      description: Returns all rules for a specific policy
+      operationId: RuleController_findAll
+      parameters:
+        - name: policyId
+          required: true
+          in: path
+          description: Policy ID to get rules for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of rules
+        '404':
+          description: Policy not found
+      security: *ref_4
+      summary: Get all rules for a policy
+      tags: *ref_5
+  /policies/{policyId}/rules/{id}:
+    get:
+      description: Returns a rule by its ID
+      operationId: RuleController_findOne
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Rule ID
+          schema:
+            type: string
+        - name: policyId
+          required: true
+          in: path
+          description: Policy ID the rule belongs to
+          schema: {}
+      responses:
+        '200':
+          description: The rule
+        '404':
+          description: Rule not found
+      security: *ref_4
+      summary: Get a rule by ID
+      tags: *ref_5
+    patch:
+      description: Updates a rule by its ID
+      operationId: RuleController_update
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Rule ID
+          schema:
+            type: string
+        - name: policyId
+          required: true
+          in: path
+          description: Policy ID the rule belongs to
+          schema: {}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRuleDto'
+      responses:
+        '200':
+          description: Rule updated successfully
+        '404':
+          description: Rule not found
+      security: *ref_4
+      summary: Update a rule
+      tags: *ref_5
+    delete:
+      description: Deletes a rule by its ID
+      operationId: RuleController_remove
+      parameters:
+        - name: id
+          required: true
+          in: path
+          description: Rule ID
+          schema:
+            type: string
+        - name: policyId
+          required: true
+          in: path
+          description: Policy ID the rule belongs to
+          schema: {}
+      responses:
+        '200':
+          description: Rule deleted successfully
+        '404':
+          description: Rule not found
+      security: *ref_4
+      summary: Delete a rule
+      tags: *ref_5
+info:
+  title: Wally API
+  description: The API documentation for the Wally application
+  version: '1.0'
+  contact: {}
+tags:
+  - name: policies
+    description: Operations related to policies
+  - name: rules
+    description: Operations related to rules
+  - name: analytics
+    description: Analytics operations
+  - name: webhooks
+    description: Webhook handlers
+servers: []
+components:
+  securitySchemes:
+    Authorization:
+      scheme: bearer
+      bearerFormat: JWT
+      type: http
+      in: header
+  schemas:
+    ProcessLogsDto:
+      type: object
+      properties:
+        userId:
+          type: string
+          description: User ID to process logs for
+          example: user_123456789
+        timeframe:
+          type: string
+          description: Timeframe for log processing
+          enum:
+            - day
+            - week
+            - month
+          default: day
+          example: day
+      required:
+        - userId
+    CreateRuleDto:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Rule name
+          example: No Password Sharing
+        description:
+          type: string
+          description: Rule description
+          example: This rule blocks prompts asking for password sharing
+        type:
+          type: string
+          description: Rule type
+          enum:
+            - KEYWORD_BLOCK
+            - SEMANTIC_BLOCK
+          example: KEYWORD_BLOCK
+        threshold:
+          type: number
+          description: Threshold for semantic rules (0 to 1)
+          example: 0.55
+      required:
+        - name
+        - description
+        - type
+    CreatePolicyDto:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Policy name
+          example: Security Policy
+        description:
+          type: string
+          description: Policy description
+          example: This policy enforces security rules
+        organizationId:
+          type: string
+          description: Organization ID
+          example: org_123456789
+        isActive:
+          type: boolean
+          description: Whether the policy is active
+          example: true
+        threshold:
+          type: number
+          description: Threshold for semantic rules (0 to 1)
+          example: 0.55
+        rules:
+          description: List of rules associated with this policy
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateRuleDto'
+      required:
+        - name
+        - organizationId
+        - isActive
+        - rules
+    EvaluatePromptDto:
+      type: object
+      properties:
+        prompt:
+          type: string
+          description: The prompt text to evaluate against policies
+          example: How to bypass security measures in a network?
+      required:
+        - prompt
+    UpdatePolicyDto:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Policy name
+          example: Security Policy
+        description:
+          type: string
+          description: Policy description
+          example: This policy enforces security rules
+        organizationId:
+          type: string
+          description: Organization ID
+          example: org_123456789
+        isActive:
+          type: boolean
+          description: Whether the policy is active
+          example: true
+        threshold:
+          type: number
+          description: Threshold for semantic rules (0 to 1)
+          example: 0.55
+        rules:
+          description: List of rules associated with this policy
+          type: array
+          items:
+            $ref: '#/components/schemas/CreateRuleDto'
+    UpdateRuleDto:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Rule type
+          enum:
+            - SEMANTIC_BLOCK
+            - KEYWORD_BLOCK
+          example: KEYWORD_BLOCK
+        name:
+          type: string
+          description: Rule name
+          example: Updated Rule Name
+        description:
+          type: string
+          description: Rule description
+          example: Updated rule description
+      required:
+        - type

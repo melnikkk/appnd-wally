@@ -11,7 +11,15 @@ import { Webhook } from 'svix';
 import { ClerkWebhooksService } from './clerk-webhooks.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../../auth/decorators/public.decorator';
+import { 
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
+  ApiBody,
+} from '@nestjs/swagger';
 
+@ApiTags('webhooks')
 @Controller('webhooks/clerk')
 @Public()
 export class ClerkWebhooksController {
@@ -23,6 +31,14 @@ export class ClerkWebhooksController {
   ) {}
 
   @Post()
+  @ApiOperation({ summary: 'Handle Clerk webhook', description: 'Processes webhooks from Clerk for user and organization events' })
+  @ApiResponse({ status: 200, description: 'Webhook processed successfully' })
+  @ApiResponse({ status: 400, description: 'Bad request - missing headers' })
+  @ApiResponse({ status: 401, description: 'Unauthorized - invalid signature' })
+  @ApiHeader({ name: 'svix-signature', required: true, description: 'Svix signature for webhook verification' })
+  @ApiHeader({ name: 'svix-id', required: true, description: 'Svix ID for webhook verification' })
+  @ApiHeader({ name: 'svix-timestamp', required: true, description: 'Svix timestamp for webhook verification' })
+  @ApiBody({ description: 'Clerk webhook payload' })
   async handleWebhook(
     @Headers('svix-signature') signature: string,
     @Headers('svix-id') id: string,
