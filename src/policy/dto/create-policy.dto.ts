@@ -11,21 +11,34 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateRuleDto } from '../../rule/dto/create-rule.dto';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePolicyDto {
+  @ApiProperty({ description: 'Policy name', example: 'Security Policy' })
   @IsString()
   name: string;
 
+  @ApiPropertyOptional({
+    description: 'Policy description',
+    example: 'This policy enforces security rules',
+  })
   @IsString()
   @IsOptional()
   description?: string;
 
+  @ApiProperty({ description: 'Organization ID', example: 'org_123456789' })
   @IsString()
   organizationId: string;
 
+  @ApiProperty({ description: 'Whether the policy is active', example: true })
   @IsBoolean()
   isActive: boolean;
 
+  @ApiPropertyOptional({
+    description: 'Threshold for semantic rules (0 to 1)',
+    example: 0.55,
+    required: false,
+  })
   @IsNumber()
   @IsPositive()
   @IsOptional()
@@ -33,6 +46,10 @@ export class CreatePolicyDto {
   @Max(1)
   threshold?: number;
 
+  @ApiProperty({
+    description: 'List of rules associated with this policy',
+    type: [CreateRuleDto],
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateRuleDto)
