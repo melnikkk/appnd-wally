@@ -8,7 +8,14 @@ export class ClerkWebhooksService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async handleUserCreated(data: any): Promise<void> {
+  async handleUserCreated(data: {
+    id: string;
+    email_addresses: Array<{
+      email_address: string;
+    }>;
+    first_name: string;
+    last_name: string;
+  }): Promise<void> {
     try {
       this.logger.log(
         `Processing user.created event for ${data.email_addresses?.[0]?.email_address}`,
@@ -42,9 +49,13 @@ export class ClerkWebhooksService {
     }
   }
 
-  async handleOrganizationCreated(data: any): Promise<void> {
+  async handleOrganizationCreated(data: {
+    name: string;
+    id: string;
+    created_by: string;
+  }): Promise<void> {
     try {
-      this.logger.log(`Processing organization.created event for ${data.name}`);
+      this.logger.log(`Processing organization.created event for ${data.id}`);
 
       const organization = await this.prisma.organization.create({
         data: {
@@ -69,7 +80,7 @@ export class ClerkWebhooksService {
         }
       }
 
-      this.logger.log(`Organization ${data.name} created successfully`);
+      this.logger.log(`Organization ${data.id} created successfully`);
     } catch (error) {
       this.logger.error(
         `Error handling organization.created event: ${error.message}`,
@@ -86,8 +97,10 @@ export class ClerkWebhooksService {
       );
 
       const email = data.email_addresses?.[0]?.email_address;
+
       if (!email) {
         this.logger.warn('No email address found in user data');
+
         return;
       }
 
@@ -149,19 +162,9 @@ export class ClerkWebhooksService {
     }
   }
 
-  async handleUserDeleted(data: any): Promise<void> {
+  async handleUserDeleted(data: { id: string }): Promise<void> {
     try {
-      this.logger.log(
-        `Processing user.deleted event for ${data.email_addresses?.[0]?.email_address}`,
-      );
-
-      const email = data.email_addresses?.[0]?.email_address;
-
-      if (!email) {
-        this.logger.warn('No email address found in user data');
-
-        return;
-      }
+      this.logger.log(`Processing user.deleted event for ${data.id}`);
 
       const existingUser = await this.prisma.user.findUnique({
         where: { clerkUserId: data.id },
@@ -177,20 +180,20 @@ export class ClerkWebhooksService {
         where: { id: existingUser.id },
       });
 
-      this.logger.log(`User ${email} deleted successfully`);
+      this.logger.log(`User ${data.id} deleted successfully`);
     } catch (error) {
       this.logger.error(
         `Error handling user.deleted event: ${error.message}`,
         error.stack,
       );
-      
+
       throw error;
     }
   }
 
-  async handleOrganizationDeleted(data: any): Promise<void> {
+  async handleOrganizationDeleted(data: { id: string }): Promise<void> {
     try {
-      this.logger.log(`Processing organization.deleted event for ${data.name}`);
+      this.logger.log(`Processing organization.deleted event for ${data.id}`);
 
       const existingOrg = await this.prisma.organization.findUnique({
         where: { clerkOrganizationId: data.id },
@@ -206,7 +209,7 @@ export class ClerkWebhooksService {
         where: { id: existingOrg.id },
       });
 
-      this.logger.log(`Organization ${data.name} deleted successfully`);
+      this.logger.log(`Organization ${data.id} deleted successfully`);
     } catch (error) {
       this.logger.error(
         `Error handling organization.deleted event: ${error.message}`,
