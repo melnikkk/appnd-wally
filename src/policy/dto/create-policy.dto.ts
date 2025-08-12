@@ -8,15 +8,26 @@ import {
   IsPositive,
   Min,
   Max,
+  IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateRuleDto } from '../../rule/dto/create-rule.dto';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { PolicyMode } from '../policy.types';
 
 export class CreatePolicyDto {
   @ApiProperty({ description: 'Policy name', example: 'Security Policy' })
   @IsString()
   name: string;
+
+  @ApiProperty({
+    description: 'Policy strategy mode',
+    enum: PolicyMode,
+    example: 'BLOCKLIST',
+    default: PolicyMode.BLOCKLIST,
+  })
+  @IsEnum(PolicyMode)
+  mode: PolicyMode;
 
   @ApiPropertyOptional({
     description: 'Policy description',
@@ -44,7 +55,7 @@ export class CreatePolicyDto {
   @IsOptional()
   @Min(0)
   @Max(1)
-  threshold?: number;
+  threshold: number;
 
   @ApiProperty({
     description: 'List of rules associated with this policy',

@@ -672,6 +672,16 @@
             "description": "Policy name",
             "example": "Security Policy"
           },
+          "mode": {
+            "type": "string",
+            "description": "Policy strategy mode",
+            "enum": [
+              "BLOCKLIST",
+              "ALLOWLIST"
+            ],
+            "example": "BLOCKLIST",
+            "default": "BLOCKLIST"
+          },
           "description": {
             "type": "string",
             "description": "Policy description",
@@ -702,6 +712,7 @@
         },
         "required": [
           "name",
+          "mode",
           "organizationId",
           "isActive",
           "rules"
@@ -727,6 +738,16 @@
             "type": "string",
             "description": "Policy name",
             "example": "Security Policy"
+          },
+          "mode": {
+            "type": "string",
+            "description": "Policy strategy mode",
+            "enum": [
+              "BLOCKLIST",
+              "ALLOWLIST"
+            ],
+            "example": "BLOCKLIST",
+            "default": "BLOCKLIST"
           },
           "description": {
             "type": "string",

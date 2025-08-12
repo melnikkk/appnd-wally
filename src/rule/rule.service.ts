@@ -1,10 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { AnalysisService } from '../analysis/analysis.service';
-import { Rule, Prisma } from '@prisma/client';
+import { Rule as PrismaRule, Prisma } from '@prisma/client';
 import { CreateRuleDto } from './dto/create-rule.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
-import { RuleType } from './rule.types';
+import { Rule, Rules, RuleType } from './rule.types';
 
 const SIMILARITY_THRESHOLD = 0.55;
 
@@ -16,20 +16,38 @@ export class RuleService {
     private readonly prisma: PrismaService,
     private readonly analysisService: AnalysisService,
   ) {}
+  
+  transformPrismaRule(prismaRule: PrismaRule): Rule {
+    return {
+      id: prismaRule.id,
+      name: prismaRule.name,
+      policyId: prismaRule.policyId,
+      type: prismaRule.type as RuleType,
+      description: prismaRule.description,
+      threshold: prismaRule.threshold || null,
+      createdAt: prismaRule.createdAt,
+      updatedAt: prismaRule.updatedAt,
+    };
+  }
+
+  transformPrismaRules(prismaRules: Array<PrismaRule>): Rules {
+    return prismaRules.map(rule => this.transformPrismaRule(rule));
+  }
 
   async create(
     policyId: string,
     createRuleDto: CreateRuleDto,
     prismaClient?: any,
   ): Promise<Rule> {
-    const { name, description, type } = createRuleDto;
+    const { name, description, type, threshold } = createRuleDto;
     const client = prismaClient || this.prisma;
 
-    const rule = await client.rule.create({
+    const prismaRule = await client.rule.create({
       data: {
         name,
         description,
         type,
+        threshold: threshold ?? null,
         policy: {
           connect: { id: policyId },
         },
@@ -43,12 +61,12 @@ export class RuleService {
         await client.$executeRaw`
           UPDATE "Rule" 
           SET "embedding" = ${embeddingArray}
-          WHERE "id" = ${rule.id};
+          WHERE "id" = ${prismaRule.id};
         `;
       }
     }
 
-    return rule;
+    return this.transformPrismaRule(prismaRule);
   }
 
   async createMany(
@@ -68,17 +86,19 @@ export class RuleService {
   }
 
   async findAllByPolicyId(policyId: string): Promise<Array<Rule>> {
-    return this.prisma.rule.findMany({
+    const prismaRules = await this.prisma.rule.findMany({
       where: { policyId },
       orderBy: { createdAt: 'desc' },
     });
+    
+    return this.transformPrismaRules(prismaRules);
   }
 
   async findAllByType(
     type: RuleType,
     organizationId: string,
   ): Promise<Array<Rule & { policy: { id: string } }>> {
-    const rules = await this.prisma.rule.findMany({
+    const prismaRules = await this.prisma.rule.findMany({
       where: {
         type,
         policy: {
@@ -95,13 +115,18 @@ export class RuleService {
       },
     });
 
-    return rules;
+    return prismaRules.map(rule => ({
+      ...this.transformPrismaRule(rule),
+      policy: rule.policy,
+    }));
   }
 
   async findOne(id: string): Promise<Rule | null> {
-    return this.prisma.rule.findUnique({
+    const prismaRule = await this.prisma.rule.findUnique({
       where: { id },
     });
+    
+    return prismaRule ? this.transformPrismaRule(prismaRule) : null;
   }
 
   async update(id: string, updateRuleDto: UpdateRuleDto): Promise<Rule> {
@@ -141,7 +166,7 @@ export class RuleService {
       }
     }
 
-    return updatedRule;
+    return this.transformPrismaRule(updatedRule);
   }
 
   async remove(id: string): Promise<void> {
@@ -161,7 +186,7 @@ export class RuleService {
       Prisma.sql`
         SELECT
           "Rule".id,
-          "Rule".embedding <=> ${vector}::vector as distance
+          cosine_distance("Rule".embedding, ${vector}::vector) as distance
         FROM "Rule"
         INNER JOIN "Policy" ON "Rule"."policyId" = "Policy"."id"
         WHERE "Rule"."policyId" = ${policyId}
@@ -213,13 +238,13 @@ export class RuleService {
           "Rule".threshold,
           "Policy".id as "policyId",
           "Policy".threshold as "policyThreshold",
-          1 - ("Rule".embedding <=> ${vector}::vector) as "similarityScore"
+          1 - cosine_distance("Rule".embedding, ${vector}::vector) as "similarityScore"
         FROM "Rule"
         INNER JOIN "Policy" ON "Rule"."policyId" = "Policy".id
         WHERE "Policy"."organizationId" = ${organizationId}
           AND "Policy"."isActive" = TRUE
           AND "Rule"."type" = '${RuleType.SEMANTIC_BLOCK}'
-          AND 1 - ("Rule".embedding <=> ${vector}::vector) > COALESCE("Rule".threshold, "Policy".threshold, ${SIMILARITY_THRESHOLD})
+          AND 1 - cosine_distance("Rule".embedding, ${vector}::vector) > COALESCE("Rule".threshold, "Policy".threshold, ${SIMILARITY_THRESHOLD})
         ORDER BY "similarityScore" DESC
         LIMIT 1;
       `,
