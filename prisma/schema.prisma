@@ -36,20 +36,31 @@ model User {
   @@index([organizationId])
 }
 
+enum PolicyStrategy {
+  BLOCKLIST
+  ALLOWLIST
+}
+
 model Policy {
-  id             String        @id @default(uuid())
+  id             String         @id @default(uuid())
+  mode           PolicyStrategy
   name           String
   description    String?
+  isActive       Boolean        @default(true)
+  threshold      Float          @default(0.7)
+
   userId         String
-  user           User          @relation(fields: [userId], references: [id])
+  user           User           @relation(fields: [userId], references: [id])
+
   organizationId String?
-  organization   Organization? @relation(fields: [organizationId], references: [id])
-  isActive       Boolean       @default(true)
+  organization   Organization?  @relation(fields: [organizationId], references: [id])
+  
   rules          Rule[]
+
   logs           RequestLog[]
+
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
-  threshold      Float         @default(0.7)
 
   @@index([userId])
   @@index([organizationId])
@@ -68,7 +79,7 @@ model Rule {
   policy      Policy   @relation(fields: [policyId], references: [id], onDelete: Cascade)
   
   type        RuleType
-  description String?
+  description String
   embedding   Unsupported("vector(3072)")?
   threshold   Float?
 

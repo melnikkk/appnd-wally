@@ -412,6 +412,14 @@ components:
           type: string
           description: Policy name
           example: Security Policy
+        mode:
+          type: string
+          description: Policy strategy mode
+          enum: &ref_6
+            - BLOCKLIST
+            - ALLOWLIST
+          example: BLOCKLIST
+          default: BLOCKLIST
         description:
           type: string
           description: Policy description
@@ -435,6 +443,7 @@ components:
             $ref: '#/components/schemas/CreateRuleDto'
       required:
         - name
+        - mode
         - organizationId
         - isActive
         - rules
@@ -454,6 +463,12 @@ components:
           type: string
           description: Policy name
           example: Security Policy
+        mode:
+          type: string
+          description: Policy strategy mode
+          enum: *ref_6
+          example: BLOCKLIST
+          default: BLOCKLIST
         description:
           type: string
           description: Policy description
