@@ -1,6 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { clerkClient } from '@clerk/clerk-sdk-node';
+import { clerkClient } from '@clerk/fastify';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
+import { 
+  InvalidSessionException,
+  UserNotFoundException 
+} from '../exceptions/auth.exceptions';
 
 @Injectable()
 export class ClerkSessionService {
@@ -15,7 +19,7 @@ export class ClerkSessionService {
       const clerkUser = await clerkClient.users.getUser(clerkUserId);
       
       if (!clerkUser) {
-        throw new Error('Invalid user ID');
+        throw new InvalidSessionException('Invalid user ID');
       }
       
       const session = { 
@@ -34,7 +38,7 @@ export class ClerkSessionService {
       if (!user) {
         this.logger.warn(`User with clerkUserId ${session.sub} not found in database`);
 
-        throw new Error('User not found in database');
+        throw new UserNotFoundException(session.sub);
       }
 
       return { 

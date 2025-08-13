@@ -3,14 +3,16 @@ import {
   Post,
   Body,
   Headers,
-  BadRequestException,
-  UnauthorizedException,
   Logger,
 } from '@nestjs/common';
 import { Webhook } from 'svix';
 import { ClerkWebhooksService } from './clerk-webhooks.service';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../../auth/decorators/public.decorator';
+import { 
+  WebhookSignatureVerificationException,
+  MissingWebhookHeadersException
+} from './exceptions/webhooks.exceptions';
 import { 
   ApiTags,
   ApiOperation,
@@ -46,13 +48,13 @@ export class ClerkWebhooksController {
     @Body() payload: any,
   ) {
     if (!signature || !id || !timestamp) {
-      throw new BadRequestException('Missing required Svix headers');
+      throw new MissingWebhookHeadersException();
     }
 
     const isValidWebhook = this.verifyWebhookSignature(signature, id, timestamp, payload);
 
     if (!isValidWebhook) {
-      throw new UnauthorizedException('Invalid webhook signature');
+      throw new WebhookSignatureVerificationException();
     }
 
     const { type, data } = payload;

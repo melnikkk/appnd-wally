@@ -5,6 +5,10 @@ import { Rule as PrismaRule, Prisma } from '@prisma/client';
 import { CreateRuleDto } from './dto/create-rule.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
 import { Rule, Rules, RuleType } from './rule.types';
+import { 
+  RuleNotFoundException,
+  RuleDeletionException
+} from './exceptions/rule.exceptions';
 
 const SIMILARITY_THRESHOLD = 0.55;
 
@@ -135,7 +139,7 @@ export class RuleService {
     const existingRule = await this.findOne(id);
 
     if (!existingRule) {
-      throw new Error(`Rule with ID ${id} not found`);
+      throw new RuleNotFoundException(id);
     }
 
     const updateData: any = {
@@ -170,9 +174,25 @@ export class RuleService {
   }
 
   async remove(id: string): Promise<void> {
-    await this.prisma.rule.delete({
-      where: { id },
-    });
+    try {
+      const existingRule = await this.findOne(id);
+      
+      if (!existingRule) {
+        throw new RuleNotFoundException(id);
+      }
+      
+      await this.prisma.rule.delete({
+        where: { id },
+      });
+    } catch (error) {
+      if (error instanceof RuleNotFoundException) {
+        throw error;
+      }
+      
+      throw new RuleDeletionException(id, { 
+        originalError: error instanceof Error ? error.message : String(error) 
+      });
+    }
   }
 
   async findMostSimilar(
