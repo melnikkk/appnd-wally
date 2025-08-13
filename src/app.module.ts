@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, APP_FILTER } from '@nestjs/core';
+import { GlobalExceptionFilter } from './common/exceptions/global-exception.filter';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
 import { QueueModule } from './infrastructure/queue/queue.module';
 import { AnalyticsModule } from './analytics/analytics.module';
@@ -31,6 +32,10 @@ import { ClerkGlobalGuard } from './auth/guards/clerk-global.guard';
     {
       provide: APP_GUARD,
       useClass: ClerkGlobalGuard,
+    },
+    {
+      provide: APP_FILTER,
+      useClass: GlobalExceptionFilter,
     }
   ],
 })

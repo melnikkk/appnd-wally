@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Policy as PrismaPolicy, Rule as PrismaRule } from '@prisma/client';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { CreatePolicyDto } from './dto/create-policy.dto';
@@ -6,6 +6,10 @@ import { UpdatePolicyDto } from './dto/update-policy.dto';
 import { RuleService } from '../rule/rule.service';
 import { AnalysisService } from '../analysis/analysis.service';
 import { Policy, Policies, PolicyMode, PolicyMatchResult } from './policy.types';
+import { 
+  PolicyNotFoundException,
+  PolicyCreationException,
+} from './exceptions/policy.exceptions';
 import { RuleType } from '../rule/rule.types';
 
 @Injectable()
@@ -64,7 +68,7 @@ export class PolicyService {
       });
 
       if (!completePolicy) {
-        throw new Error(`Failed to fetch created policy with id ${policy.id}`);
+        throw new PolicyCreationException(`Failed to fetch created policy with id ${policy.id}`, { policyId: policy.id });
       }
 
       return this.transformPrismaPolicy(completePolicy);
@@ -183,7 +187,7 @@ export class PolicyService {
     const existingPolicy = await this.findOne(id);
 
     if (!existingPolicy) {
-      throw new NotFoundException(`Policy with id ${id} not found`);
+      throw new PolicyNotFoundException(id);
     }
 
     const updatedPolicy = await this.prisma.policy.update({

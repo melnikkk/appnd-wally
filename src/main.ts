@@ -1,8 +1,10 @@
 import { NestFactory } from '@nestjs/core';
-import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
-import { AppModule } from './app.module';
 import { ValidationPipe } from '@nestjs/common';
 import { clerkPlugin } from '@clerk/fastify';
+import { AppModule } from './app.module';
+import { FastifyAdapter, NestFastifyApplication } from '@nestjs/platform-fastify';
+import { BadRequestException } from './common/exceptions/common.exceptions';
+import { ErrorCode } from './common/exceptions/error-codes.enum';
 
 async function bootstrap() {
   process.env.CLERK_API_KEY = process.env.CLERK_SECRET_KEY;
@@ -18,6 +20,19 @@ async function bootstrap() {
     whitelist: true,
     transform: true,
     forbidNonWhitelisted: true,
+    exceptionFactory: (errors) => {
+      const validationErrors = errors.reduce((acc, error) => {
+        acc[error.property] = Object.values(error.constraints || {}).join(', ');
+        
+        return acc;
+      }, {});
+      
+      return new BadRequestException(
+        'Validation failed',
+        ErrorCode.UNPROCESSABLE_ENTITY, 
+        { validationErrors }
+      );
+    }
   }));
   
   const port = process.env.PORT ?? 8080;
