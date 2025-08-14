@@ -1,31 +1,30 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { clerkClient } from '@clerk/fastify';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { 
+import {
   InvalidSessionException,
-  UserNotFoundException 
+  UserNotFoundException,
 } from '../exceptions/auth.exceptions';
 
 @Injectable()
 export class ClerkSessionService {
   private readonly logger = new Logger(ClerkSessionService.name);
 
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   async validateSession(clerkUserId: string) {
     try {
       const clerkUser = await clerkClient.users.getUser(clerkUserId);
-      
+
       if (!clerkUser) {
         throw new InvalidSessionException('Invalid user ID');
       }
-      
-      const session = { 
+
+      const session = {
         sub: clerkUserId,
-        primaryEmailAddress: clerkUser.emailAddresses.find(email => 
-          email.id === clerkUser.primaryEmailAddressId)?.emailAddress
+        primaryEmailAddress: clerkUser.emailAddresses.find(
+          (email) => email.id === clerkUser.primaryEmailAddressId,
+        )?.emailAddress,
       };
 
       const user = await this.prisma.user.findUnique({
@@ -41,8 +40,8 @@ export class ClerkSessionService {
         throw new UserNotFoundException(session.sub);
       }
 
-      return { 
-        session, 
+      return {
+        session,
         user: {
           id: user.id,
           email: user.email,
@@ -50,8 +49,8 @@ export class ClerkSessionService {
           lastName: user.lastName,
           role: user.role,
           organizationId: user.organizationId,
-          organization: user.organization
-        }
+          organization: user.organization,
+        },
       };
     } catch (error) {
       this.logger.error(`Failed to validate session: ${error.message}`);
