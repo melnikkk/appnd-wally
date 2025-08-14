@@ -6,11 +6,14 @@ import { UpdatePolicyDto } from './dto/update-policy.dto';
 import { RuleService } from '../rule/rule.service';
 import { AnalysisService } from '../analysis/analysis.service';
 import { Policy, Policies, PolicyMode, PolicyMatchResult } from './policy.types';
-import { 
+import {
   PolicyNotFoundException,
   PolicyCreationException,
+  PolicyForbiddenException,
+  PolicyEvaluationException,
 } from './exceptions/policy.exceptions';
 import { RuleType } from '../rule/rule.types';
+import { BadRequestException } from '../common/exceptions/common.exceptions';
 
 @Injectable()
 export class PolicyService {
@@ -22,7 +25,9 @@ export class PolicyService {
     private readonly analysisService: AnalysisService,
   ) {}
 
-  private transformPrismaPolicy(prismaPolicy: PrismaPolicy & {rules: Array<PrismaRule>}): Policy {
+  private transformPrismaPolicy(
+    prismaPolicy: PrismaPolicy & { rules: Array<PrismaRule> },
+  ): Policy {
     return {
       id: prismaPolicy.id,
       mode: prismaPolicy.mode as PolicyMode,
@@ -38,8 +43,32 @@ export class PolicyService {
     };
   }
 
-  async create(userId: string, createPolicyDto: CreatePolicyDto): Promise<Policy> {
-    const { name, description, organizationId, rules, isActive, mode, threshold } = createPolicyDto;
+  private async verifyPolicyAccess(
+    organizationId: string,
+    policyId: string,
+  ): Promise<void> {
+    const policy = await this.prisma.policy.findUnique({
+      where: { id: policyId },
+      select: { organizationId: true },
+    });
+
+    if (!policy) {
+      throw new PolicyNotFoundException(policyId);
+    }
+
+    const doesPolicyBelongToOrganisation = policy?.organizationId === organizationId;
+
+    if (!doesPolicyBelongToOrganisation) {
+      throw new PolicyForbiddenException();
+    }
+  }
+
+  async create(
+    organizationId: string,
+    userId: string,
+    createPolicyDto: CreatePolicyDto,
+  ): Promise<Policy> {
+    const { name, description, rules, isActive, mode, threshold } = createPolicyDto;
 
     return this.prisma.executeInTransaction(async (prisma) => {
       const policy = await prisma.policy.create({
@@ -68,7 +97,10 @@ export class PolicyService {
       });
 
       if (!completePolicy) {
-        throw new PolicyCreationException(`Failed to fetch created policy with id ${policy.id}`, { policyId: policy.id });
+        throw new PolicyCreationException(
+          `Failed to fetch created policy with id ${policy.id}`,
+          { policyId: policy.id },
+        );
       }
 
       return this.transformPrismaPolicy(completePolicy);
@@ -84,14 +116,16 @@ export class PolicyService {
   }): Promise<Policies> {
     const { userId, organizationId, isActive, skip, take } = params;
 
-    const where: Prisma.PolicyWhereInput = {};
+    if (!organizationId) {
+      throw new PolicyForbiddenException('Organization ID is required');
+    }
+
+    const where: Prisma.PolicyWhereInput = {
+      organizationId,
+    };
 
     if (userId) {
       where.userId = userId;
-    }
-
-    if (organizationId) {
-      where.organizationId = organizationId;
     }
 
     if (isActive !== undefined) {
@@ -143,12 +177,14 @@ export class PolicyService {
     });
 
     const policyMap = new Map(policies.map((p) => [p.id, p]));
-    const orderedPolicies = policyIds.map((id) => policyMap.get(id)).filter(Boolean) as (PrismaPolicy & {rules: Array<PrismaRule>})[];
+    const orderedPolicies = policyIds
+      .map((id) => policyMap.get(id))
+      .filter(Boolean) as (PrismaPolicy & { rules: Array<PrismaRule> })[];
 
     return orderedPolicies.map((policy) => this.transformPrismaPolicy(policy));
   }
 
-  async findOne(id: string): Promise<Policy | null> {
+  async findOne(id: string, organizationId?: string): Promise<Policy> {
     const policy = await this.prisma.policy.findUnique({
       where: { id },
       include: {
@@ -157,38 +193,34 @@ export class PolicyService {
             createdAt: 'desc',
           },
         },
-        user: {
-          select: {
-            id: true,
-            email: true,
-            firstName: true,
-            lastName: true,
-          },
-        },
-        organization: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
       },
     });
 
     if (!policy) {
-      return null;
+      throw new PolicyNotFoundException(`Policy with ID ${id} not found`);
+    }
+
+    if (policy.organizationId !== organizationId) {
+      throw new PolicyForbiddenException('User does not have access to this policy');
     }
 
     return this.transformPrismaPolicy(policy);
   }
 
-  async update(id: string, updatePolicyDto: UpdatePolicyDto): Promise<Policy> {
+  async update(
+    id: string,
+    updatePolicyDto: UpdatePolicyDto,
+    organizationId?: string,
+  ): Promise<Policy> {
+    if (!organizationId) {
+      throw new PolicyForbiddenException('Organization ID is required');
+    }
+
+    await this.verifyPolicyAccess(organizationId, id);
+
     const { name, description, isActive, mode, threshold } = updatePolicyDto;
 
-    const existingPolicy = await this.findOne(id);
-
-    if (!existingPolicy) {
-      throw new PolicyNotFoundException(id);
-    }
+    const existingPolicy = await this.findOne(id, organizationId);
 
     const updatedPolicy = await this.prisma.policy.update({
       where: { id },
@@ -207,127 +239,142 @@ export class PolicyService {
     return this.transformPrismaPolicy(updatedPolicy);
   }
 
-  async remove(id: string): Promise<void> {
-    await this.prisma.policy.delete({
-      where: { id },
-    });
+  async remove(id: string, organizationId?: string): Promise<void> {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
+    await this.verifyPolicyAccess(organizationId, id);
+
+    try {
+      await this.prisma.policy.delete({
+        where: { id },
+      });
+
+      this.logger.log(
+        `Policy ${id} successfully deleted by organization ${organizationId}`,
+      );
+    } catch (error) {
+      throw new PolicyForbiddenException('Failed to delete policy');
+    }
   }
 
   async findBestMatchForPolicy(
     policyId: string,
-    organizationId: string,
     prompt: string,
+    organizationId?: string,
   ): Promise<PolicyMatchResult> {
-    const policy = await this.findOne(policyId);
-
-    if (!policy) {
-      return { matched: false };
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required for policy evaluation');
     }
 
-    if (policy.organizationId !== organizationId) {
-      this.logger.warn(
-        `Policy ${policyId} does not belong to organization ${organizationId}`,
+    try {
+      const policy = await this.findOne(policyId, organizationId);
+
+      for (const rule of policy.rules) {
+        if (rule.type !== RuleType.KEYWORD_BLOCK) {
+          continue;
+        }
+
+        const description = rule.description;
+
+        if (description.startsWith('/') && description.match(/\/[gimuy]*$/)) {
+          try {
+            const pattern = description.replace(/^\/|\/[gimuy]*$/g, '');
+            const flags = description.match(/\/([gimuy]*)$/)?.[1] || '';
+            const regex = new RegExp(pattern, flags);
+
+            if (regex.test(prompt)) {
+              return {
+                matched: true,
+                rule: {
+                  id: rule.id,
+                  name: rule.name,
+                  description: rule.description,
+                },
+                policyId: policy.id,
+                ruleType: rule.type,
+              };
+            }
+          } catch (error) {
+            this.logger.error(
+              `Invalid regex pattern in rule ${rule.id}: ${error.message}`,
+            );
+          }
+        } else if (
+          description &&
+          prompt.toLowerCase().includes(description.toLowerCase())
+        ) {
+          return {
+            matched: true,
+            rule: {
+              id: rule.id,
+              name: rule.name,
+              description: rule.description,
+            },
+            policyId: policy.id,
+            ruleType: rule.type,
+          };
+        }
+      }
+
+      const promptEmbedding = await this.analysisService.generateEmbedding(prompt);
+      const vector = `[${promptEmbedding.join(',')}]`;
+
+      const result = await this.prisma.$queryRaw<
+        Array<{
+          ruleId: string;
+          description: string;
+          name: string;
+          policyId: string;
+          similarityScore: number;
+        }>
+      >(
+        Prisma.sql`
+          SELECT
+            "Rule".id as "ruleId",
+            "Rule".name,
+            "Rule".description,
+            "Rule".threshold,
+            "Policy".id as "policyId",
+            "Policy".threshold as "policyThreshold",
+            1 - cosine_distance("Rule".embedding, ${vector}::vector) as "similarityScore"
+          FROM "Rule"
+          INNER JOIN "Policy" ON "Rule"."policyId" = "Policy".id
+          WHERE "Rule"."policyId" = ${policyId}
+            AND "Policy"."organizationId" = ${organizationId}
+            AND "Rule"."type" = 'SEMANTIC_BLOCK'
+            AND 1 - cosine_distance("Rule".embedding, ${vector}::vector) > COALESCE("Rule".threshold, "Policy".threshold, 0.55)
+          ORDER BY "similarityScore" DESC
+          LIMIT 1;
+        `,
       );
 
-      return { matched: false };
-    }
-
-    for (const rule of policy.rules) {
-      if (rule.type !== RuleType.KEYWORD_BLOCK) {
-        continue;
+      if (!result || result.length === 0) {
+        return { matched: false };
       }
 
-      const description = rule.description;
+      const bestMatch = result[0];
 
-      if (
-        description.startsWith('/') &&
-        description.match(/\/[gimuy]*$/)
-      ) {
-        try {
-          const pattern = description.replace(/^\/|\/[gimuy]*$/g, '');
-          const flags = description.match(/\/([gimuy]*)$/)?.[1] || '';
-          const regex = new RegExp(pattern, flags);
+      this.logger.debug(
+        `Semantic match found in rule ${bestMatch.ruleId} with score ${bestMatch.similarityScore}`,
+      );
 
-          if (regex.test(prompt)) {
-            return {
-              matched: true,
-              rule: {
-                id: rule.id,
-                name: rule.name,
-                description: rule.description,
-              },
-              policyId: policy.id,
-              ruleType: rule.type,
-            };
-          }
-        } catch (error) {
-          this.logger.error(`Invalid regex pattern in rule ${rule.id}: ${error.message}`);
-        }
-      } else if (
-        description &&
-        prompt.toLowerCase().includes(description.toLowerCase())
-      ) {
-        return {
-          matched: true,
-          rule: {
-            id: rule.id,
-            name: rule.name,
-            description: rule.description,
-          },
-          policyId: policy.id,
-          ruleType: rule.type,
-        };
-      }
+      return {
+        matched: true,
+        rule: {
+          id: bestMatch.ruleId,
+          name: bestMatch.name,
+          description: bestMatch.description,
+        },
+        policyId: bestMatch.policyId,
+        similarityScore: bestMatch.similarityScore,
+        ruleType: RuleType.SEMANTIC_BLOCK,
+      };
+    } catch (error) {
+      throw new PolicyEvaluationException(
+        `Error evaluating policy ${policyId} for organization ${organizationId}: ${error.message}`,
+      );
     }
-
-    const promptEmbedding = await this.analysisService.generateEmbedding(prompt);
-
-    const vector = `[${promptEmbedding.join(',')}]`;
-
-    const result = await this.prisma.$queryRaw<
-      Array<{
-        ruleId: string;
-        description: string;
-        name: string;
-        policyId: string;
-        similarityScore: number;
-      }>
-    >(
-      Prisma.sql`
-        SELECT
-          "Rule".id as "ruleId",
-          "Rule".name,
-          "Rule".description,
-          "Rule".threshold,
-          "Policy".id as "policyId",
-          "Policy".threshold as "policyThreshold",
-          1 - cosine_distance("Rule".embedding, ${vector}::vector) as "similarityScore"
-        FROM "Rule"
-        INNER JOIN "Policy" ON "Rule"."policyId" = "Policy".id
-        WHERE "Rule"."policyId" = ${policyId}
-          AND "Rule"."type" = 'SEMANTIC_BLOCK'
-          AND 1 - cosine_distance("Rule".embedding, ${vector}::vector) > COALESCE("Rule".threshold, "Policy".threshold, 0.55)
-        ORDER BY "similarityScore" DESC
-        LIMIT 1;
-      `,
-    );
-
-    if (!result || result.length === 0) {
-      return { matched: false };
-    }
-
-    const bestMatch = result[0];
-
-    return {
-      matched: true,
-      rule: {
-        id: bestMatch.ruleId,
-        name: bestMatch.name,
-        description: bestMatch.description,
-      },
-      policyId: bestMatch.policyId,
-      similarityScore: bestMatch.similarityScore,
-      ruleType: RuleType.SEMANTIC_BLOCK,
-    };
   }
 }

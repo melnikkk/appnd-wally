@@ -168,8 +168,18 @@ paths:
       responses:
         '200':
           description: The policy
+        '403':
+          description: Policy does not belong to organization
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyForbiddenException'
         '404':
           description: Policy not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PolicyNotFoundException'
       security: *ref_2
       summary: Get a policy by ID
       tags: *ref_3
@@ -424,10 +434,6 @@ components:
           type: string
           description: Policy description
           example: This policy enforces security rules
-        organizationId:
-          type: string
-          description: Organization ID
-          example: org_123456789
         isActive:
           type: boolean
           description: Whether the policy is active
@@ -444,7 +450,6 @@ components:
       required:
         - name
         - mode
-        - organizationId
         - isActive
         - rules
     EvaluatePromptDto:
@@ -456,6 +461,12 @@ components:
           example: How to bypass security measures in a network?
       required:
         - prompt
+    PolicyForbiddenException:
+      type: object
+      properties: {}
+    PolicyNotFoundException:
+      type: object
+      properties: {}
     UpdatePolicyDto:
       type: object
       properties:
@@ -473,10 +484,6 @@ components:
           type: string
           description: Policy description
           example: This policy enforces security rules
-        organizationId:
-          type: string
-          description: Organization ID
-          example: org_123456789
         isActive:
           type: boolean
           description: Whether the policy is active
