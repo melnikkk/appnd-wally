@@ -42,14 +42,15 @@ export class PolicyController {
 
   @Post()
   @ApiOperation({
-    summary: 'Create a new policy',
-    description: 'Creates a new policy with associated rules',
+    summary: 'Create new policies',
+    description: 'Creates new policies with associated rules',
   })
-  @ApiResponse({ status: 201, description: 'Policy successfully created' })
+  @ApiResponse({ status: 201, description: 'Policies successfully created' })
   @ApiResponse({ status: 400, description: 'Bad request' })
-  @ApiBody({ type: CreatePolicyDto })
-  async create(@CurrentUser() user, @Body() createPolicyDto: CreatePolicyDto) {
-    return this.policyService.create(user.organizationId, user.id, createPolicyDto);
+  @ApiResponse({ status: 403, description: 'Organization ID is required' })
+  @ApiBody({ type: Array<CreatePolicyDto> })
+  async create(@CurrentUser() user, @Body() createPoliciesDto: Array<CreatePolicyDto>) {
+    return this.policyService.createMany(user.id, createPoliciesDto, user.organizationId);
   }
 
   @Post('evaluate')

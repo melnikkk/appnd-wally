@@ -82,7 +82,7 @@ paths:
         - webhooks
   /policies:
     post:
-      description: Creates a new policy with associated rules
+      description: Creates new policies with associated rules
       operationId: PolicyController_create
       parameters: []
       requestBody:
@@ -90,15 +90,19 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreatePolicyDto'
+              type: array
+              items:
+                type: string
       responses:
         '201':
-          description: Policy successfully created
+          description: Policies successfully created
         '400':
           description: Bad request
+        '403':
+          description: Organization ID is required
       security: &ref_2
         - bearer: []
-      summary: Create a new policy
+      summary: Create new policies
       tags: &ref_3
         - policies
     get:
@@ -389,6 +393,21 @@ components:
           example: day
       required:
         - userId
+    EvaluatePromptDto:
+      type: object
+      properties:
+        prompt:
+          type: string
+          description: The prompt text to evaluate against policies
+          example: How to bypass security measures in a network?
+      required:
+        - prompt
+    PolicyForbiddenException:
+      type: object
+      properties: {}
+    PolicyNotFoundException:
+      type: object
+      properties: {}
     CreateRuleDto:
       type: object
       properties:
@@ -452,21 +471,6 @@ components:
         - mode
         - isActive
         - rules
-    EvaluatePromptDto:
-      type: object
-      properties:
-        prompt:
-          type: string
-          description: The prompt text to evaluate against policies
-          example: How to bypass security measures in a network?
-      required:
-        - prompt
-    PolicyForbiddenException:
-      type: object
-      properties: {}
-    PolicyNotFoundException:
-      type: object
-      properties: {}
     UpdatePolicyDto:
       type: object
       properties:
