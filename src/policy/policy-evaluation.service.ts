@@ -2,6 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../infrastructure/prisma/prisma.service';
 import { PolicyService } from './policy.service';
 import { PolicyMode, Policies } from './policy.types';
+import { PolicyForbiddenException } from './exceptions/policy.exceptions';
+import { BadRequestException } from '../common/exceptions/common.exceptions';
 
 @Injectable()
 export class PolicyEvaluationService {
@@ -23,6 +25,10 @@ export class PolicyEvaluationService {
     similarityScore?: number;
     ruleType?: string;
   }> {
+    if (!organizationId) {
+      throw new BadRequestException('Organization ID is required');
+    }
+
     const policies = await this.policyService.findAll({
       organizationId,
       isActive: true,
@@ -80,8 +86,8 @@ export class PolicyEvaluationService {
     for (const policy of policies) {
       const evaluation = await this.policyService.findBestMatchForPolicy(
         policy.id,
-        organizationId,
         prompt,
+        organizationId,
       );
 
       if (evaluation.matched) {
@@ -108,12 +114,12 @@ export class PolicyEvaluationService {
     matchedPolicy?: string;
     similarityScore?: number;
     ruleType?: string;
-  }> { 
+  }> {
     for (const policy of policies) {
       const evaluation = await this.policyService.findBestMatchForPolicy(
         policy.id,
-        organizationId,
         prompt,
+        organizationId,
       );
 
       if (evaluation.matched && evaluation.rule) {
@@ -143,38 +149,63 @@ export class PolicyEvaluationService {
       similarityScore?: number;
       ruleType?: string;
     },
-  ) {
-    const user = await this.prisma.user.findFirst({
-      where: { id: userId, organizationId },
-    });
-
-    if (!user) {
-      throw new Error('Logging failed: User does not belong to the organization.');
+  ): Promise<void> {
+    if (!organizationId) {
+      throw new PolicyForbiddenException(
+        'Organization ID is required for logging evaluations',
+      );
     }
 
-    await this.prisma.requestLog.create({
-      data: {
-        user: {
-          connect: { id: userId },
-        },
-        policy: evaluation.matchedPolicy
-          ? {
-              connect: { id: evaluation.matchedPolicy },
-            }
-          : undefined,
-        request: {
-          prompt,
-          timestamp: new Date().toISOString(),
-        },
-        response: {
+    try {
+      const user = await this.prisma.user.findFirst({
+        where: { id: userId, organizationId },
+      });
+
+      if (!user) {
+        throw new PolicyForbiddenException('User does not belong to the organization');
+      }
+
+      if (evaluation.matchedPolicy) {
+        const policy = await this.prisma.policy.findUnique({
+          where: { id: evaluation.matchedPolicy },
+          select: { organizationId: true },
+        });
+
+        if (policy?.organizationId !== organizationId) {
+          throw new PolicyForbiddenException(
+            'Policy does not belong to the organization',
+          );
+        }
+      }
+
+      await this.prisma.requestLog.create({
+        data: {
+          user: {
+            connect: { id: userId },
+          },
+          policy: evaluation.matchedPolicy
+            ? {
+                connect: { id: evaluation.matchedPolicy },
+              }
+            : undefined,
+          request: {
+            prompt,
+            timestamp: new Date().toISOString(),
+          },
+          response: {
+            blocked: evaluation.blocked,
+            blockReason: evaluation.blockReason,
+            similarityScore: evaluation.similarityScore,
+            ruleType: evaluation.ruleType,
+          },
           blocked: evaluation.blocked,
           blockReason: evaluation.blockReason,
-          similarityScore: evaluation.similarityScore,
-          ruleType: evaluation.ruleType,
         },
-        blocked: evaluation.blocked,
-        blockReason: evaluation.blockReason,
-      },
-    });
+      });
+    } catch (error) {
+      this.logger.error(`Failed to log evaluation: ${error.message}`);
+
+      throw error;
+    }
   }
 }

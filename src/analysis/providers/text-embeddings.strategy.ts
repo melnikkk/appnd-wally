@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
 import { TextEmbeddingProvider } from '../interfaces/text-embeding-provider.interface';
 import { GeminiTextEmbeddingProvider } from './gemeni-text-embeddings.provider';
+import { InternalServerErrorException } from '../../common/exceptions/common.exceptions';
 
 export const textEmbeddingProviderFactory = {
   provide: 'TextEmbeddingProvider',
@@ -11,7 +12,9 @@ export const textEmbeddingProviderFactory = {
       case 'gemini':
         return new GeminiTextEmbeddingProvider(configService);
       default:
-        throw new Error(`Invalid or missing EMBEDDING_PROVIDER: ${providerType}`);
+        throw new InternalServerErrorException(
+          `Invalid or missing EMBEDDING_PROVIDER: ${providerType}`,
+        );
     }
   },
   inject: [ConfigService],

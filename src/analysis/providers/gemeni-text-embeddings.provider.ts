@@ -2,6 +2,7 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';
 import { GenerativeModel, GoogleGenerativeAI } from '@google/generative-ai';
 import { TextEmbeddingProvider } from '../interfaces/text-embeding-provider.interface';
+import { AIProviderInternalException } from '../exceptions/provider.exceptions';
 
 export class GeminiTextEmbeddingProvider implements TextEmbeddingProvider {
   private readonly modelName: string = 'gemini-embedding-001';
@@ -14,7 +15,9 @@ export class GeminiTextEmbeddingProvider implements TextEmbeddingProvider {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
 
     if (!apiKey) {
-      throw new Error('GEMINI_API_KEY is not defined in the configuration.');
+      throw new AIProviderInternalException(
+        'AI provider key is not defined in the configuration.',
+      );
     }
 
     this.genAI = new GoogleGenerativeAI(apiKey);
@@ -26,12 +29,12 @@ export class GeminiTextEmbeddingProvider implements TextEmbeddingProvider {
       const {
         embedding: { values },
       } = await this.model.embedContent(prompt);
-      
+
       return values;
     } catch (error) {
       this.logger.error('Failed to get embeddings from Gemini', error);
 
-      throw new Error('Failed to get embeddings');
+      throw new AIProviderInternalException('Failed to get embeddings');
     }
   }
 }

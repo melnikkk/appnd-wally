@@ -37,10 +37,6 @@ export class CreatePolicyDto {
   @IsOptional()
   description?: string;
 
-  @ApiProperty({ description: 'Organization ID', example: 'org_123456789' })
-  @IsString()
-  organizationId: string;
-
   @ApiProperty({ description: 'Whether the policy is active', example: true })
   @IsBoolean()
   isActive: boolean;

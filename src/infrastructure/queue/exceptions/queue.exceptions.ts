@@ -1,5 +1,5 @@
-import { BaseException } from '../../../common/exceptions/base.exception';
 import { HttpStatus } from '@nestjs/common';
+import { BaseException } from '../../../common/exceptions/base.exception';
 import { NotFoundException } from '../../../common/exceptions/common.exceptions';
 import { ErrorCode } from '../../../common/exceptions/error-codes.enum';
 
