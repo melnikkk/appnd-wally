@@ -11,32 +11,37 @@ async function bootstrap() {
 
   const app = await NestFactory.create<NestFastifyApplication>(
     AppModule,
-    new FastifyAdapter()
+    new FastifyAdapter(),
   );
 
-  await app.register(clerkPlugin);
-  
-  app.useGlobalPipes(new ValidationPipe({
-    whitelist: true,
-    transform: true,
-    forbidNonWhitelisted: true,
-    exceptionFactory: (errors) => {
-      const validationErrors = errors.reduce((acc, error) => {
-        acc[error.property] = Object.values(error.constraints || {}).join(', ');
-        
-        return acc;
-      }, {});
-      
-      return new BadRequestException(
-        'Validation failed',
-        ErrorCode.UNPROCESSABLE_ENTITY, 
-        { validationErrors }
-      );
-    }
-  }));
-  
+  await app.register(clerkPlugin, {
+    publishableKey: process.env.CLERK_PUBLISHABLE_KEY,
+    secretKey: process.env.CLERK_SECRET_KEY,
+  });
+
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+      exceptionFactory: (errors) => {
+        const validationErrors = errors.reduce((acc, error) => {
+          acc[error.property] = Object.values(error.constraints || {}).join(', ');
+
+          return acc;
+        }, {});
+
+        return new BadRequestException(
+          'Validation failed',
+          ErrorCode.UNPROCESSABLE_ENTITY,
+          { validationErrors },
+        );
+      },
+    }),
+  );
+
   const port = process.env.PORT ?? 8080;
-  
+
   await app.listen(port, '0.0.0.0');
 
   console.log(`Application is running on: ${await app.getUrl()}`);

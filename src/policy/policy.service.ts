@@ -1,8 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
 import { Policy, Policies, PolicyMatchResult } from './policy.types';
 import { CreatePolicyDto } from './dto/create-policy.dto';
 import { UpdatePolicyDto } from './dto/update-policy.dto';
-import type { PolicyRepository } from './repositories/policy-repository.interface';
+import * as policyRepositoryInterface from './repositories/policy-repository.interface';
 import {
   PolicyNotFoundException,
   PolicyForbiddenException,
@@ -13,7 +13,10 @@ import { BadRequestException } from '../common/exceptions/common.exceptions';
 export class PolicyService {
   private readonly logger = new Logger(PolicyService.name);
 
-  constructor(private readonly policyRepository: PolicyRepository) {}
+  constructor(
+    @Inject(policyRepositoryInterface.POLICY_REPOSITORY)
+    private readonly policyRepository: policyRepositoryInterface.PolicyRepository,
+  ) {}
 
   async createMany(
     userId: string,

@@ -1,29 +1,22 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Prisma, Policy as PrismaPolicy, Rule as PrismaRule } from '@prisma/client';
 import { PrismaService } from '../../infrastructure/prisma/prisma.service';
-import { AnalysisService } from '../../analysis/analysis.service';
 import { RuleService } from '../../rule/rule.service';
 import { Policy, Policies, PolicyMatchResult } from '../policy.types';
 import { CreatePolicyDto } from '../dto/create-policy.dto';
 import { UpdatePolicyDto } from '../dto/update-policy.dto';
 import { FindAllParams, PolicyRepository } from './policy-repository.interface';
-import { RuleType } from '../../rule/rule.types';
 import {
   PolicyNotFoundException,
   PolicyCreationException,
   PolicyForbiddenException,
   PolicyEvaluationException,
 } from '../exceptions/policy.exceptions';
+import { PolicyMatcherService } from '../matchers/policy-matcher.service';
 
 @Injectable()
 export class PrismaPolicyRepository implements PolicyRepository {
   private readonly logger = new Logger(PrismaPolicyRepository.name);
-
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly ruleService: RuleService,
-    private readonly analysisService: AnalysisService,
-  ) {}
 
   private transformPrismaPolicy(
     prismaPolicy: PrismaPolicy & { rules: Array<PrismaRule> },
@@ -42,6 +35,12 @@ export class PrismaPolicyRepository implements PolicyRepository {
       updatedAt: prismaPolicy.updatedAt,
     };
   }
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ruleService: RuleService,
+    private readonly policyMatcherService: PolicyMatcherService,
+  ) {}
 
   async verifyPolicyAccess(organizationId: string, policyId: string): Promise<boolean> {
     const policy = await this.prisma.policy.findUnique({
@@ -247,106 +246,13 @@ export class PrismaPolicyRepository implements PolicyRepository {
         throw new PolicyNotFoundException(policyId);
       }
 
-      for (const rule of policy.rules) {
-        if (rule.type !== RuleType.KEYWORD_BLOCK) {
-          continue;
-        }
-
-        const description = rule.description;
-
-        if (description.startsWith('/') && description.match(/\/[gimuy]*$/)) {
-          try {
-            const pattern = description.replace(/^\/|\/[gimuy]*$/g, '');
-            const flags = description.match(/\/([gimuy]*)$/)?.[1] || '';
-            const regex = new RegExp(pattern, flags);
-
-            if (regex.test(prompt)) {
-              return {
-                matched: true,
-                rule: {
-                  id: rule.id,
-                  name: rule.name,
-                  description: rule.description,
-                },
-                policyId: policy.id,
-                ruleType: rule.type,
-              };
-            }
-          } catch (error) {
-            this.logger.error(
-              `Invalid regex pattern in rule ${rule.id}: ${error.message}`,
-            );
-          }
-        } else if (
-          description &&
-          prompt.toLowerCase().includes(description.toLowerCase())
-        ) {
-          return {
-            matched: true,
-            rule: {
-              id: rule.id,
-              name: rule.name,
-              description: rule.description,
-            },
-            policyId: policy.id,
-            ruleType: rule.type,
-          };
-        }
+      if (policy.organizationId !== organizationId) {
+        throw new PolicyForbiddenException(
+          'Organization does not have access to this policy',
+        );
       }
 
-      const promptEmbedding = await this.analysisService.generateEmbedding(prompt);
-      const vector = `[${promptEmbedding.join(',')}]`;
-
-      const result = await this.prisma.$queryRaw<
-        Array<{
-          ruleId: string;
-          description: string;
-          name: string;
-          policyId: string;
-          similarityScore: number;
-        }>
-      >(
-        Prisma.sql`
-          SELECT
-            "Rule".id as "ruleId",
-            "Rule".name,
-            "Rule".description,
-            "Rule".threshold,
-            "Policy".id as "policyId",
-            "Policy".threshold as "policyThreshold",
-            1 - cosine_distance("Rule".embedding, ${vector}::vector) as "similarityScore"
-          FROM "Rule"
-          INNER JOIN "Policy" ON "Rule"."policyId" = "Policy".id
-          WHERE "Rule"."policyId" = ${policyId}
-            AND "Policy"."organizationId" = ${organizationId}
-            AND "Rule"."type" = 'SEMANTIC_BLOCK'
-            AND 1 - cosine_distance("Rule".embedding, ${vector}::vector) > COALESCE("Rule".threshold, "Policy".threshold, 0.55)
-          ORDER BY "similarityScore" DESC
-          LIMIT 1;
-        `,
-      );
-
-      if (!result || result.length === 0) {
-        return { matched: false };
-      }
-
-      const bestMatch = result[0];
-
-      this.logger.debug(
-        `Semantic match found in rule ${bestMatch.ruleId} with score ${bestMatch.similarityScore}`,
-      );
-
-      return {
-        matched: true,
-        rule: {
-          id: bestMatch.ruleId,
-          name: bestMatch.name,
-          description: bestMatch.description,
-        },
-        policyId: bestMatch.policyId,
-        similarityScore: bestMatch.similarityScore,
-        ruleType: RuleType.SEMANTIC_BLOCK,
-      };
+      return await this.policyMatcherService.findBestMatchForPolicy(policy, prompt);
     } catch (error) {
       throw new PolicyEvaluationException(
         `Error evaluating policy ${policyId} for organization ${organizationId}: ${error.message}`,

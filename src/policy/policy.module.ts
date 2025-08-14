@@ -7,16 +7,17 @@ import { RuleService } from '../rule/rule.service';
 import { RuleController } from '../rule/rule.controller';
 import { PolicyEvaluationService } from './policy-evaluation.service';
 import { PrismaPolicyRepository } from './repositories/prisma-policy.repository';
-import { PolicyRepository } from './repositories/policy-repository.interface';
+import { POLICY_REPOSITORY } from './repositories/policy-repository.interface';
+import { PolicyMatchersModule } from './matchers/policy-matchers.module';
 
 @Module({
-  imports: [PrismaModule, AnalysisModule],
+  imports: [PrismaModule, AnalysisModule, PolicyMatchersModule],
   providers: [
     PolicyService,
     RuleService,
     PolicyEvaluationService,
     {
-      provide: PolicyRepository,
+      provide: POLICY_REPOSITORY,
       useClass: PrismaPolicyRepository,
     },
   ],

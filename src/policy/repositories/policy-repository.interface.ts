@@ -2,6 +2,8 @@ import { Policy, Policies, PolicyMatchResult } from '../policy.types';
 import { CreatePolicyDto } from '../dto/create-policy.dto';
 import { UpdatePolicyDto } from '../dto/update-policy.dto';
 
+export const POLICY_REPOSITORY = 'POLICY_REPOSITORY';
+
 export interface FindAllParams {
   userId?: string;
   organizationId?: string;
