@@ -5,9 +5,9 @@ import { Rule as PrismaRule, Prisma } from '@prisma/client';
 import { CreateRuleDto } from './dto/create-rule.dto';
 import { UpdateRuleDto } from './dto/update-rule.dto';
 import { Rule, Rules, RuleType } from './rule.types';
-import { 
+import {
   RuleNotFoundException,
-  RuleDeletionException
+  RuleDeletionException,
 } from './exceptions/rule.exceptions';
 
 const SIMILARITY_THRESHOLD = 0.55;
@@ -20,7 +20,7 @@ export class RuleService {
     private readonly prisma: PrismaService,
     private readonly analysisService: AnalysisService,
   ) {}
-  
+
   transformPrismaRule(prismaRule: PrismaRule): Rule {
     return {
       id: prismaRule.id,
@@ -35,7 +35,7 @@ export class RuleService {
   }
 
   transformPrismaRules(prismaRules: Array<PrismaRule>): Rules {
-    return prismaRules.map(rule => this.transformPrismaRule(rule));
+    return prismaRules.map((rule) => this.transformPrismaRule(rule));
   }
 
   async create(
@@ -94,7 +94,7 @@ export class RuleService {
       where: { policyId },
       orderBy: { createdAt: 'desc' },
     });
-    
+
     return this.transformPrismaRules(prismaRules);
   }
 
@@ -119,7 +119,7 @@ export class RuleService {
       },
     });
 
-    return prismaRules.map(rule => ({
+    return prismaRules.map((rule) => ({
       ...this.transformPrismaRule(rule),
       policy: rule.policy,
     }));
@@ -129,12 +129,12 @@ export class RuleService {
     const prismaRule = await this.prisma.rule.findUnique({
       where: { id },
     });
-    
+
     return prismaRule ? this.transformPrismaRule(prismaRule) : null;
   }
 
   async update(id: string, updateRuleDto: UpdateRuleDto): Promise<Rule> {
-    const { name, description, type } = updateRuleDto;
+    const { name, description, type, threshold } = updateRuleDto;
 
     const existingRule = await this.findOne(id);
 
@@ -143,9 +143,10 @@ export class RuleService {
     }
 
     const updateData: any = {
-      type,
-      name: name || existingRule.name,
-      description: description || existingRule.description,
+      type: type ?? existingRule.type,
+      name: name ?? existingRule.name,
+      description: description ?? existingRule.description,
+      threshold: threshold ?? existingRule.threshold,
     };
 
     const updatedRule = await this.prisma.rule.update({
@@ -154,9 +155,9 @@ export class RuleService {
     });
 
     const shouldUpdateEmbedding =
+      description &&
       (type === RuleType.SEMANTIC_BLOCK ||
-        (existingRule.type === RuleType.SEMANTIC_BLOCK && !type)) &&
-      description;
+        (existingRule.type === RuleType.SEMANTIC_BLOCK && !type));
 
     if (shouldUpdateEmbedding) {
       const embeddingArray = await this.analysisService.generateEmbedding(description);
@@ -176,11 +177,11 @@ export class RuleService {
   async remove(id: string): Promise<void> {
     try {
       const existingRule = await this.findOne(id);
-      
+
       if (!existingRule) {
         throw new RuleNotFoundException(id);
       }
-      
+
       await this.prisma.rule.delete({
         where: { id },
       });
@@ -188,9 +189,9 @@ export class RuleService {
       if (error instanceof RuleNotFoundException) {
         throw error;
       }
-      
-      throw new RuleDeletionException(id, { 
-        originalError: error instanceof Error ? error.message : String(error) 
+
+      throw new RuleDeletionException(id, {
+        originalError: error instanceof Error ? error.message : String(error),
       });
     }
   }
