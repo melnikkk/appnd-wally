@@ -1,12 +1,17 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { UserRole } from '@prisma/client';
+import { PrismaService } from '../prisma/prisma.service';
+import { UserService } from '../../user/user.service';
+import { CreateUserDto } from '../../user/repositories/user-repository.interface';
 
 @Injectable()
 export class ClerkWebhooksService {
   private readonly logger = new Logger(ClerkWebhooksService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly userService: UserService,
+  ) {}
 
   async handleUserCreated(data: {
     id: string;
@@ -25,19 +30,18 @@ export class ClerkWebhooksService {
 
       if (!email) {
         this.logger.warn('No email address found in user data');
-
         return;
       }
 
-      await this.prisma.user.create({
-        data: {
-          email,
-          clerkUserId: data.id,
-          firstName: data.first_name,
-          lastName: data.last_name,
-          role: UserRole.USER,
-        },
-      });
+      const createUserDto: CreateUserDto = {
+        email,
+        clerkUserId: data.id,
+        firstName: data.first_name,
+        lastName: data.last_name,
+        role: UserRole.USER,
+      };
+
+      await this.userService.createUser(createUserDto);
 
       this.logger.log(`User ${email} created successfully`);
     } catch (error) {
@@ -65,17 +69,12 @@ export class ClerkWebhooksService {
       });
 
       if (data.created_by) {
-        const user = await this.prisma.user.findUnique({
-          where: { clerkUserId: data.created_by },
-        });
+        const user = await this.userService.findUserByClerkId(data.created_by);
 
         if (user) {
-          await this.prisma.user.update({
-            where: { id: user.id },
-            data: {
-              organizationId: organization.id,
-              role: UserRole.OWNER,
-            },
+          await this.userService.updateUser(user.id, {
+            organizationId: organization.id,
+            role: UserRole.OWNER,
           });
         }
       }
@@ -100,26 +99,20 @@ export class ClerkWebhooksService {
 
       if (!email) {
         this.logger.warn('No email address found in user data');
-
         return;
       }
 
-      const existingUser = await this.prisma.user.findUnique({
-        where: { clerkUserId: data.id },
-      });
+      const existingUser = await this.userService.findUserByClerkId(data.id);
 
       if (!existingUser) {
         this.logger.warn(`User with Clerk ID ${data.id} not found`);
         return;
       }
 
-      await this.prisma.user.update({
-        where: { id: existingUser.id },
-        data: {
-          email: email,
-          firstName: data.first_name,
-          lastName: data.last_name,
-        },
+      await this.userService.updateUser(existingUser.id, {
+        email: email,
+        firstName: data.first_name,
+        lastName: data.last_name,
       });
 
       this.logger.log(`User ${email} updated successfully`);
@@ -166,19 +159,14 @@ export class ClerkWebhooksService {
     try {
       this.logger.log(`Processing user.deleted event for ${data.id}`);
 
-      const existingUser = await this.prisma.user.findUnique({
-        where: { clerkUserId: data.id },
-      });
+      const existingUser = await this.userService.findUserByClerkId(data.id);
 
       if (!existingUser) {
         this.logger.warn(`User with Clerk ID ${data.id} not found`);
-
         return;
       }
 
-      await this.prisma.user.delete({
-        where: { id: existingUser.id },
-      });
+      await this.userService.deleteUser(existingUser.id);
 
       this.logger.log(`User ${data.id} deleted successfully`);
     } catch (error) {
