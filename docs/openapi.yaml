@@ -80,6 +80,21 @@ paths:
       summary: Handle Clerk webhook
       tags:
         - webhooks
+  /users/current:
+    get:
+      description: Retrieves the current user based on the authenticated session.
+      operationId: UserController_getCurrentUser
+      parameters: []
+      responses:
+        '200':
+          description: Successfully retrieved current user.
+        '401':
+          description: Unauthorized - user is not authenticated.
+        '404':
+          description: User not found - the user does not exist in the system.
+      summary: Get current user
+      tags:
+        - User
   /policies:
     post:
       description: Creates new policies with associated rules
